@@ -154,7 +154,8 @@
       u.uMauNuocNong.value.set(bm.nuocNong);
       u.uMatDoSuong.value = bm.matDoSuong;
 
-      // three.js (r155+) dùng đơn vị ánh sáng vật lý: muốn bề mặt trắng được chiếu
+      // index.html bật physicallyCorrectLights: true → đèn dùng đơn vị vật lý (A-Frame
+      // mặc định vẫn dùng đèn kiểu cũ). Ở chế độ vật lý, muốn bề mặt trắng được chiếu
       // sáng "bằng 1" thì cường độ phải là π. Nhân π ở đây để bảng màu dễ đọc.
       this.nang.color.set(bm.mauNang);
       this.nang.intensity = bm.cuongDoNang * Math.PI;

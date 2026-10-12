@@ -231,7 +231,9 @@
    *    Vì sao cần "ten"? three.js dùng chung chương trình shader đã biên dịch
    *    cho các vật liệu có cùng "khóa". Mặc định khóa = mã nguồn hàm
    *    onBeforeCompile – mà mọi vật liệu đều dùng CHUNG hàm dưới đây, nên phải
-   *    tự đặt khóa khác nhau, nếu không đảo sẽ bị dùng nhầm shader của buồm.
+   *    tự đặt khóa khác nhau. Nếu không, 2 vật liệu cùng loại và cùng thiết lập
+   *    (cùng MeshLambert, cùng mặt vẽ, cùng vertex color...) nhưng khác đoạn
+   *    GLSL chèn thêm sẽ dùng nhầm shader của nhau.
    * --------------------------------------------------------------------- */
   HALONG.vaShader = function (vatLieu, tuyChon) {
     tuyChon = tuyChon || {};
@@ -251,7 +253,11 @@
           'vec3 phapTuyenTG = objectNormal;',
           '#ifdef USE_INSTANCING',
           '  viTriTG = instanceMatrix * viTriTG;          // vật vẽ bằng InstancedMesh',
-          '  phapTuyenTG = mat3(instanceMatrix) * phapTuyenTG;',
+          '  // Pháp tuyến: nếu tỉ lệ x, y, z KHÁC nhau (đảo bị kéo dãn) thì không nhân thẳng',
+          '  // ma trận được – phải chia cho bình phương tỉ lệ từng trục trước (ma trận',
+          '  // nghịch đảo-chuyển vị), giống cách three.js tự làm trong defaultnormal_vertex.',
+          '  mat3 mtThe = mat3(instanceMatrix);',
+          '  phapTuyenTG = mtThe * (phapTuyenTG / vec3(dot(mtThe[0], mtThe[0]), dot(mtThe[1], mtThe[1]), dot(mtThe[2], mtThe[2])));',
           '#endif',
           'vViTriTheGioi = (modelMatrix * viTriTG).xyz;',
           'vPhapTuyenTG = mat3(modelMatrix) * phapTuyenTG;'
@@ -292,7 +298,7 @@
 
   /* -----------------------------------------------------------------------
    * 7. GHÉP HÌNH (merge geometry) – giảm số draw call
-   *    Mỗi vật thể riêng = 1 lệnh vẽ. Thuyền có hàng trăm chi tiết (cột,
+   *    Mỗi vật thể riêng = 1 lệnh vẽ. Thuyền có khoảng 56 chi tiết (thân, cột,
    *    lan can, nẹp buồm...) → gộp TẤT CẢ chi tiết cùng vật liệu thành 1 hình
    *    duy nhất = 1 lệnh vẽ. Màu riêng từng chi tiết giữ bằng vertex color.
    * --------------------------------------------------------------------- */

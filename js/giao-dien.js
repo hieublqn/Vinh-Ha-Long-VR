@@ -50,9 +50,13 @@
       document.body.appendChild(this.bangDiemDung);
 
       var sceneEl = this.el;
+      this.diemDungCuoi = null;   // điểm dừng đang neo (để hiện lại khi lên thuyền)
       this.khiDenDiemDung = this.hienDiemDung.bind(this);
-      this.khiRoiDiemDung = function () { this.bangDiemDung.classList.add('an'); }.bind(this);
-      this.khiDoiCheDo = this.capNhatChip.bind(this);
+      this.khiRoiDiemDung = function () {
+        this.diemDungCuoi = null;
+        this.bangDiemDung.classList.add('an');
+      }.bind(this);
+      this.khiDoiCheDo = this.khiDoiCheDoFn.bind(this);
       sceneEl.addEventListener('den-diem-dung', this.khiDenDiemDung);
       sceneEl.addEventListener('roi-diem-dung', this.khiRoiDiemDung);
       sceneEl.addEventListener('doi-che-do', this.khiDoiCheDo);
@@ -68,9 +72,28 @@
       HALONG.thongKe = { fps: 0, drawCall: 0, tamGiac: 0 };
 
       this.khiNhanPhim = function (e) {
-        if (e.code === 'KeyH') this.bangHuongDan.classList.toggle('an');
+        // !e.repeat: giữ phím lâu thì trình duyệt tự lặp keydown → bảng sẽ nhấp nháy
+        if (e.code === 'KeyH' && !e.repeat) this.bangHuongDan.classList.toggle('an');
       }.bind(this);
       window.addEventListener('keydown', this.khiNhanPhim);
+
+      // Điện thoại không có bàn phím: bảng phím chỉ che màn hình → ẩn sẵn
+      // (Mốc 5 sẽ thêm nút ảo + hướng dẫn cảm ứng)
+      if (AFRAME.utils.device.isMobile()) this.bangHuongDan.classList.add('an');
+
+      // Nút kính VR: máy không hỗ trợ WebXR "immersive-vr" (laptop không cắm kính) thì
+      // bấm nút chỉ làm khung 3D toàn màn hình và che HUD → ẩn nút đi.
+      function anNutVR() { sceneEl.setAttribute('xr-mode-ui', 'enabled', false); }
+      if (!navigator.xr || !navigator.xr.isSessionSupported) anNutVR();
+      else navigator.xr.isSessionSupported('immersive-vr').then(function (co) { if (!co) anNutVR(); }, anNutVR);
+
+      // Biên dịch SẴN mọi shader ngay khi bắt đầu vẽ. Nếu không, vật nào lúc đầu nằm
+      // sau lưng (cabin, buồm...) chỉ được biên dịch khi người dùng quay lại nhìn
+      // → khựng hình một nhịp giữa chừng.
+      this.khiBatDauVe = function () {
+        if (sceneEl.renderer.compile && sceneEl.camera) sceneEl.renderer.compile(sceneEl.object3D, sceneEl.camera);
+      };
+      sceneEl.addEventListener('renderstart', this.khiBatDauVe);
     },
 
     remove: function () {
@@ -78,11 +101,26 @@
       this.el.removeEventListener('den-diem-dung', this.khiDenDiemDung);
       this.el.removeEventListener('roi-diem-dung', this.khiRoiDiemDung);
       this.el.removeEventListener('doi-che-do', this.khiDoiCheDo);
+      this.el.removeEventListener('renderstart', this.khiBatDauVe);
       [this.bangHuongDan, this.bangThongSo, this.chipCheDo, this.bangDiemDung].forEach(function (el) { el.remove(); });
+    },
+
+    dangTrenThuyen: function () {
+      var dk = document.querySelector('[dieu-khien]');
+      return !!dk && dk.getAttribute('dieu-khien').cheDo === 'du-thuyen';
+    },
+
+    // Đổi chế độ: rời thuyền thì ẩn bảng điểm dừng; lên lại thuyền đúng lúc đang neo thì hiện lại
+    khiDoiCheDoFn: function (e) {
+      if (e.detail.cheDo === 'tu-do') this.bangDiemDung.classList.add('an');
+      else if (this.diemDungCuoi) this.hienDiemDung({ detail: this.diemDungCuoi });
+      this.capNhatChip();
     },
 
     // Bảng tên + mô tả ngắn của điểm dừng (Mốc 4 sẽ thay bằng bảng 3D đầy đủ)
     hienDiemDung: function (e) {
+      this.diemDungCuoi = e.detail;
+      if (!this.dangTrenThuyen()) return;           // đang bay tự do: không thuyết minh
       var dd = e.detail.diem, tong = HALONG.LO_TRINH.diemDung.length;
       this.bangDiemDung.innerHTML = '';
       var nhan = document.createElement('div');
@@ -98,10 +136,8 @@
 
     // Nội dung chip: chế độ hiện tại + điểm kế tiếp / thời gian còn neo
     capNhatChip: function () {
-      var dk = document.querySelector('[dieu-khien]');
-      var cheDo = dk ? dk.getAttribute('dieu-khien').cheDo : 'tu-do';
       var tt = HALONG.thuyen, chu;
-      if (cheDo === 'du-thuyen' && tt) {
+      if (this.dangTrenThuyen() && tt) {
         var tiep = HALONG.LO_TRINH.diemDung[tt.diemTiep];
         chu = tt.trangThai === 'dung'
           ? 'Đang neo · rời bến sau ' + Math.ceil(tt.cho) + ' giây'

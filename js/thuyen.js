@@ -7,7 +7,7 @@
  *      QUA đúng các điểm mốc) → thuyền chạy vòng quanh không bị gấp khúc.
  *   2. MÔ HÌNH THUYỀN (component "thuyen-buom"): thân gỗ dựng bằng công
  *      thức toán, boong, lan can, cabin, 3 cột buồm, cánh buồm nâu có nếp
- *      gấp kiểu thuyền mành. Hàng trăm chi tiết được GỘP thành 3 hình
+ *      gấp kiểu thuyền mành. Khoảng 56 chi tiết được GỘP thành 3 hình
  *      (gỗ / cabin / buồm) → chỉ 3 draw call.
  *   3. DU THUYỀN (component "du-thuyen"): cho thuyền chạy theo lộ trình,
  *      tăng/giảm tốc êm, dừng ở mỗi điểm tham quan, nhấp nhô theo sóng.
@@ -52,8 +52,9 @@
       },
       {
         chiSo: 6, ten: 'Làng chài Cửa Vạn',
-        // TODO cần kiểm tra: hiện trạng dân cư (nhiều hộ đã lên bờ tái định cư)
-        moTa: 'Làng chài nổi trên vịnh, nơi ngư dân sống trên nhà bè và làm nghề biển.',
+        // TODO cần kiểm tra: năm tái định cư (2014) và số hộ còn ở lại trên vịnh
+        moTa: 'Làng chài trên vịnh nổi tiếng nhất Hạ Long. Từ năm 2014 phần lớn ngư dân đã lên bờ ' +
+          'tái định cư; một số nhà bè được giữ lại để bảo tồn văn hóa làng chài và đón khách.',
         vatThe: { loai: 'lang-chai', x: -268, z: -22, banKinh: 58 }
       },
       {
@@ -136,14 +137,25 @@
     dai: DAI,
     viTri: new THREE.Vector3(),
     goc: 0,                  // góc hướng (radian, quay quanh trục Y)
+    doc: 0,                  // góc chúi mũi (radian, > 0: mũi ngóc lên)
+    nghieng: 0,              // góc lắc ngang (radian, > 0: mạn phải nâng lên)
     tocDo: 0,                // m/s
     trangThai: 'dung',
     diemTiep: 0,             // chỉ số điểm dừng sắp tới
     conLai: 0,               // còn bao nhiêu mét tới điểm dừng đó
     viTriBatDauTrenBoong: new THREE.Vector2(0, -8.2),   // (x, z) cục bộ: gần mũi thuyền
 
-    // Độ cao mặt boong tại z cục bộ
+    // Độ cao mặt boong tại z cục bộ (thuyền nằm thẳng)
     doCaoBoong: function (z) { return doCaoBoong(tTheoZ(z)); },
+
+    // Độ cao THẾ GIỚI của mặt boong tại điểm (x, z) cục bộ, có tính thuyền đang
+    // chúi/lắc. Thứ tự xoay 'YXZ': lắc (Z) trước, rồi chúi (X), rồi hướng (Y – không
+    // đổi độ cao). Nhờ vậy chân người luôn chạm đúng mặt sàn đang chòng chành.
+    doCaoSanThe: function (x, z) {
+      var yB = doCaoBoong(tTheoZ(z));
+      return this.viTri.y + (x * Math.sin(this.nghieng) + yB * Math.cos(this.nghieng)) * Math.cos(this.doc) -
+        z * Math.sin(this.doc);
+    },
 
     // Giữ 1 điểm (x, z) cục bộ nằm trong vùng boong được phép đi
     // (từ gần mũi tới trước cửa cabin, cách mạn 0.45 m, tránh 2 cột buồm)
@@ -262,7 +274,8 @@
     uv.push(0, 0);
     c.copy(MAU_THAN); mau.push(c.r, c.g, c.b);
     for (j = 0; j < cot - 1; j++) chiSo.push(tam, dau + j, dau + j + 1);
-    // Đậy kín mép trên vách đuôi
+    // Tam giác cuối nối mép mạn phải ↔ mép mạn trái → vách đuôi kín, không thủng
+    chiSo.push(tam, dau + cot - 1, dau);
     var hinh = new THREE.BufferGeometry();
     hinh.setAttribute('position', new THREE.Float32BufferAttribute(viTri, 3));
     hinh.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -511,12 +524,12 @@
         // Quãng đường còn lại tới điểm dừng kế tiếp (lộ trình khép kín → quấn vòng)
         var conLai = ((ds[this.diemTiep].s - this.s) % L + L) % L;
         // Tốc độ mục tiêu: tối đa, nhưng đủ chậm để kịp phanh: v² = 2·a·quãng đường
-        var vMucTieu = Math.min(d.tocDo, Math.sqrt(2 * d.giaToc * Math.max(conLai - 0.5, 0)) + 0.15);
+        var vMucTieu = Math.min(d.tocDo, Math.sqrt(2 * d.giaToc * conLai) + 0.15);
         var thayDoi = THREE.MathUtils.clamp(vMucTieu - this.v, -2 * d.giaToc * giay, d.giaToc * giay);
         this.v = Math.max(this.v + thayDoi, 0);
         var buoc = this.v * giay;
-        if (buoc >= conLai || conLai < 0.4) {
-          // Tới nơi: neo lại
+        if (buoc >= conLai || conLai < 0.01) {
+          // Tới nơi: neo lại (bước cuối chỉ vài mm → không giật)
           this.s = ds[this.diemTiep].s;
           this.v = 0;
           this.trangThai = 'dung';
@@ -545,15 +558,22 @@
       var hMui = HALONG.doCaoSong(x - s * 9, z - c * 9), hDuoi = HALONG.doCaoSong(x + s * 9, z + c * 9);
       var hPhai = HALONG.doCaoSong(x + c * 2.5, z - s * 2.5), hTrai = HALONG.doCaoSong(x - c * 2.5, z + s * 2.5);
 
+      // Chúi: nước phía mũi cao hơn → mũi ngóc lên (xoay X dương nâng mũi -Z).
+      // Lắc: nước mạn phải cao hơn → mạn phải nâng lên (xoay Z dương nâng mạn +X).
+      // Nhân 0.35: thuyền nặng, lắc ít hơn mặt sóng (và đỡ say sóng khi đeo kính).
+      var doc = Math.atan2(hMui - hDuoi, 18) * 0.35;
+      var nghieng = Math.atan2(hPhai - hTrai, 5) * 0.35;
       var o = this.el.object3D;
-      o.position.set(x, h * 0.8, z);
+      o.position.set(x, h * 0.7, z);
       o.rotation.order = 'YXZ';
-      o.rotation.set(Math.atan2(hMui - hDuoi, 18) * 0.6, goc, Math.atan2(hTrai - hPhai, 5) * 0.6);
+      o.rotation.set(doc, goc, nghieng);
 
       // Chia sẻ trạng thái cho các file khác
       var tt = HALONG.thuyen;
       tt.viTri.copy(o.position);
       tt.goc = goc;
+      tt.doc = doc;
+      tt.nghieng = nghieng;
       tt.tocDo = this.v;
       tt.trangThai = this.trangThai;
       tt.diemTiep = this.diemTiep;

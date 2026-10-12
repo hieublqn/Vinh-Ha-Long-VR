@@ -26,11 +26,13 @@
     }
   </script>
 
-  <!-- 2) Các component tự viết. Thứ tự quan trọng: tien-ich.js phải đứng đầu -->
+  <!-- 2) Các component tự viết. tien-ich.js phải đứng ĐẦU vì các file sau dùng ngay
+          HALONG.glsl, HALONG.smoothstep... khi vừa được nạp. Các file còn lại chỉ dùng
+          dữ liệu của nhau lúc component khởi tạo (sau khi mọi file đã nạp xong). -->
   <script src="js/tien-ich.js"></script>
   <script src="js/bau-troi.js"></script>
   <script src="js/bien.js"></script>
-  <script src="js/thuyen.js"></script>      <!-- trước dao-da-voi.js: đảo cần biết lộ trình để chừa luồng -->
+  <script src="js/thuyen.js"></script>      <!-- tạo lộ trình (HALONG.LO_TRINH): đảo dùng để chừa luồng -->
   <script src="js/dao-da-voi.js"></script>
   <script src="js/dieu-khien.js"></script>
   <script src="js/giao-dien.js"></script>
@@ -40,15 +42,20 @@
     renderer:
       antialias      : khử răng cưa
       alpha: false   : canvas không trong suốt (trình duyệt đỡ phải trộn với trang web)
-      physicallyCorrectLights: đơn vị ánh sáng vật lý (chuẩn mới của three.js)
+      physicallyCorrectLights: đơn vị ánh sáng vật lý (chuẩn mới của three.js; A-Frame
+                       mặc định là kiểu cũ) → bau-troi.js nhân cường độ đèn với π
       toneMapping    : ACESFilmic – nén vùng quá sáng (mặt trời) cho giống ảnh chụp
     light="defaultLightsEnabled: false": tắt đèn mặc định của A-Frame, dùng đèn
       riêng do bau-troi.js tạo.
+    keyboard-shortcuts="enterVR: false": tắt phím F (A-Frame mặc định dùng F để vào VR;
+      máy không có kính thì F làm khung 3D toàn màn hình và che mất bảng HUD).
+    xr-mode-ui: nút kính VR góc phải (giao-dien.js tự ẩn nút nếu máy không hỗ trợ VR).
   -->
   <a-scene
     renderer="antialias: true; alpha: false; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.1"
     light="defaultLightsEnabled: false"
-    vr-mode-ui="enabled: true"
+    keyboard-shortcuts="enterVR: false"
+    xr-mode-ui="enabled: true"
     loading-screen="dotsColor: #ffb26b; backgroundColor: #1b1530"
     giao-dien>
 
@@ -62,8 +69,9 @@
     <a-entity id="quan-dao" dao-da-voi="soDao: 60; hatGiong: 1994"></a-entity>
 
     <!-- Thuyền buồm + du thuyền tự động theo lộ trình.
-         Đặt TRƯỚC rig: mỗi khung hình thuyền di chuyển trước, rồi rig mới bám theo
-         (nếu ngược lại, người đứng trên boong sẽ bị trễ 1 khung hình → rung). -->
+         Lưu ý: A-Frame chạy tick() theo LOẠI component (thứ tự đăng ký), không theo
+         thứ tự thẻ HTML. dieu-khien khai báo after: ['du-thuyen'] để thuyền di chuyển
+         trước, rig bám theo sau (nếu ngược lại, người trên boong bị trễ 1 khung → rung). -->
     <a-entity id="thuyen" thuyen-buom du-thuyen></a-entity>
 
     <!-- Người dùng: rig (để di chuyển) chứa camera (để nhìn quanh).

@@ -13,8 +13,10 @@
  * 2 CHẾ ĐỘ (phím M để đổi):
  *   "du-thuyen": người dùng ĐỨNG TRÊN BOONG thuyền. Mỗi khung hình, rig được
  *       đặt lại theo vị trí + hướng của thuyền (cộng vị trí đang đứng trên
- *       boong) → thuyền chạy thì người chạy theo, thuyền rẽ thì người xoay theo.
- *       W A S D đi lại trên boong, không bước ra ngoài mạn / xuyên cột buồm.
+ *       boong) → thuyền chạy thì người chạy theo, thuyền rẽ thì người xoay theo,
+ *       sóng nâng hạ sàn thì người nâng hạ theo.
+ *       W A S D đi lại trên boong; vị trí ĐẦU được giữ trong vùng boong
+ *       (không thò ra ngoài mạn / xuyên cột buồm, kể cả khi đeo kính bước đi).
  *   "tu-do": rời thuyền, bay tự do trên mặt nước:
  *       W A S D / phím mũi tên : đi tới / lùi / sang ngang (theo hướng đang nhìn)
  *       Shift                  : đi nhanh
@@ -31,6 +33,11 @@
   var TRUC_Y = new THREE.Vector3(0, 1, 0);
 
   AFRAME.registerComponent('dieu-khien', {
+    // A-Frame gọi tick() theo TỪNG LOẠI component, theo thứ tự đăng ký (không theo
+    // thứ tự thẻ HTML). 'after' bắt A-Frame chạy component này SAU 'du-thuyen':
+    // thuyền di chuyển xong rồi rig mới bám theo → người đứng trên boong không bị
+    // trễ 1 khung hình (trễ sẽ thấy boong rung dưới chân).
+    after: ['du-thuyen'],
     schema: {
       cheDo: { default: 'du-thuyen', oneOf: ['du-thuyen', 'tu-do'] },
       tocDoTrenBoong: { default: 1.6 }, // m/s – đi bộ trên boong
@@ -49,7 +56,10 @@
       this.truoc = new THREE.Vector3(0, 0, -1);
       this.phai = new THREE.Vector3(1, 0, 0);
       this.dau = new THREE.Vector3();
-      this.viTriBoong = new THREE.Vector2();   // (x, z) đang đứng trên boong (hệ tọa độ thuyền)
+      this.q = new THREE.Quaternion();
+      this.euler = new THREE.Euler();
+      this.viTriBoong = new THREE.Vector2();   // (x, z) tâm rig trên boong (hệ tọa độ thuyền)
+      this.viTriDau = new THREE.Vector2();     // (x, z) của ĐẦU trên boong (dùng khi kẹp)
       this.datLaiTrenBoong();
 
       this.khiNhanPhim = this.khiNhanPhim.bind(this);
@@ -111,13 +121,14 @@
       var camera = this.el.sceneEl.camera;
       if (!camera) return;
 
-      // 1) Hướng "phía trước" = hướng camera đang nhìn, chiếu xuống mặt phẳng ngang
-      camera.getWorldDirection(this.truoc);
-      this.truoc.y = 0;
-      if (this.truoc.lengthSq() > 1e-6) {
-        this.truoc.normalize();
-        this.phai.crossVectors(this.truoc, TRUC_Y);   // tích có hướng → vector bên phải
-      }
+      // 1) Hướng "phía trước" lấy từ góc QUAY NGANG (yaw) của camera.
+      //    Không chiếu hướng nhìn xuống mặt phẳng ngang, vì khi nhìn thẳng xuống
+      //    chân (hoặc lên trời) hình chiếu đó gần bằng 0 → W/S sẽ "đứng hình".
+      //    Thứ tự 'YXZ': tách riêng góc quay ngang (Y) trước góc cúi/ngửa (X).
+      camera.getWorldQuaternion(this.q);
+      var yaw = this.euler.setFromQuaternion(this.q, 'YXZ').y;
+      this.truoc.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+      this.phai.crossVectors(this.truoc, TRUC_Y);     // tích có hướng → vector bên phải
 
       // 2) Đọc phím
       var trenThuyen = this.data.cheDo === 'du-thuyen' && HALONG.thuyen;
@@ -152,21 +163,34 @@
     diTrenBoong: function (giay) {
       var tt = HALONG.thuyen, goc = tt.goc;
       var c = Math.cos(goc), s = Math.sin(goc);
+      var o = this.el.object3D;
+
+      // Độ lệch của ĐẦU so với tâm rig, đổi sang hệ thuyền. Trên máy tính = 0;
+      // khi đeo kính, người dùng bước đi trong phòng thật nên đầu lệch khỏi tâm rig.
+      this.el.sceneEl.camera.getWorldPosition(this.dau);
+      var ox = this.dau.x - o.position.x, oz = this.dau.z - o.position.z;
+      var lechX = ox * c - oz * s, lechZ = ox * s + oz * c;
+
       // Đổi bước đi (hệ thế giới) → hệ thuyền: xoay ngược 1 góc 'goc' quanh trục Y
       var dx = this.vanToc.x * giay, dz = this.vanToc.z * giay;
       this.viTriBoong.x += dx * c - dz * s;
       this.viTriBoong.y += dx * s + dz * c;
-      tt.kepTrenBoong(this.viTriBoong);
 
-      // Đổi vị trí trên boong (hệ thuyền) → hệ thế giới: xoay 'goc' rồi cộng vị trí thuyền
+      // Kẹp vị trí ĐẦU (không phải tâm rig) trong vùng boong → không thò đầu ra ngoài mạn
+      this.viTriDau.set(this.viTriBoong.x + lechX, this.viTriBoong.y + lechZ);
+      tt.kepTrenBoong(this.viTriDau);
+      this.viTriBoong.set(this.viTriDau.x - lechX, this.viTriDau.y - lechZ);
+
+      // Đổi vị trí trên boong (hệ thuyền) → hệ thế giới: xoay 'goc' rồi cộng vị trí thuyền.
+      // Độ cao = mặt sàn ĐÚNG chỗ đang đứng (có tính thuyền chúi/lắc) → chân không lơ lửng.
       var bx = this.viTriBoong.x, bz = this.viTriBoong.y;
-      var o = this.el.object3D;
       o.position.set(
         tt.viTri.x + bx * c + bz * s,
-        tt.viTri.y + tt.doCaoBoong(bz),
+        tt.doCaoSanThe(this.viTriDau.x, this.viTriDau.y),
         tt.viTri.z - bx * s + bz * c
       );
-      // Chỉ xoay theo hướng thuyền (không lắc theo sóng → đỡ say sóng khi đeo kính)
+      // Rig chỉ xoay theo HƯỚNG thuyền, không chúi/lắc theo (đỡ say sóng khi đeo kính);
+      // phần nhấp nhô lên xuống vẫn có vì sàn boong nâng hạ theo sóng.
       o.rotation.set(0, goc, 0);
     },
 
@@ -179,19 +203,31 @@
       // Vị trí ĐẦU thật = rig + camera (khi đeo kính, đầu có thể lệch khỏi tâm rig)
       this.el.sceneEl.camera.getWorldPosition(this.dau);
 
-      var vatCan = HALONG.vatCan;
+      // Mỗi đảo là 1 hình ELIP (đảo bị kéo dài theo 1 trục và xoay 1 góc).
+      // Cách xét: đổi vị trí đầu sang hệ tọa độ riêng của đảo (xoay ngược), chia cho
+      // 2 bán trục → nếu nằm trong hình tròn đơn vị (q < 1) là đang ở trong đảo.
+      var vatCan = HALONG.vatCan, k = d.khoangCachDao;
       for (var i = 0; i < vatCan.length; i++) {
         var o = vatCan[i];
         if (this.dau.y > o.cao + 2) continue;          // đang bay cao hơn đỉnh đảo → cho qua
         var dx = this.dau.x - o.x, dz = this.dau.z - o.z;
-        var kc = Math.hypot(dx, dz);
-        var toiThieu = o.r + d.khoangCachDao;
-        if (kc < toiThieu && kc > 1e-4) {
-          // Đẩy ra theo hướng từ tâm đảo → người dùng "trượt" dọc theo vách
-          var day = (toiThieu - kc) / kc;
-          p.x += dx * day; p.z += dz * day;
-          this.dau.x += dx * day; this.dau.z += dz * day;
+        var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0);
+        var lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
+        var ax = (o.rX || o.r) + k, az = (o.rZ || o.r) + k;
+        var q = Math.hypot(lx / ax, lz / az);
+        if (q >= 1) continue;
+        // Hạ xuống từ phía trên, sát đỉnh → đẩy LÊN (đứng trên đỉnh đảo),
+        // thay vì văng ngang hàng chục mét trong 1 khung hình
+        if (this.dau.y > o.cao - 4 && o.cao + 0.4 <= d.doCaoToiDa) {
+          var len = o.cao + 2 - this.dau.y;
+          p.y += len; this.dau.y += len;
+          continue;
         }
+        // Đi ngang vào vách → đẩy ra điểm trên mép elip cùng hướng ("trượt" dọc vách)
+        if (q < 1e-4) { lx = ax; lz = 0; } else { lx /= q; lz /= q; }
+        var mx = lx * cs + lz * sn, mz = -lx * sn + lz * cs;   // đổi ngược về hệ thế giới
+        p.x += mx - dx; p.z += mz - dz;
+        this.dau.x += mx - dx; this.dau.z += mz - dz;
       }
 
       // Giới hạn vùng chơi hình tròn

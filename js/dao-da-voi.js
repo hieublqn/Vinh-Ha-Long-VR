@@ -12,9 +12,9 @@
  *   2. Tô màu từng đỉnh (vertex color): đá xám be, vệt phong hóa sẫm,
  *      dải đen ở chân, cây xanh ở chỗ bề mặt hướng lên.
  *   3. Rải đảo bằng random CÓ SEED → mở lần nào đảo cũng ở đúng chỗ đó.
- *   4. Mỗi khuôn vẽ bằng 1 InstancedMesh: GPU vẽ HÀNG CHỤC đảo cùng khuôn
- *      chỉ bằng 1 lệnh vẽ (draw call), mỗi đảo có vị trí/xoay/tỉ lệ riêng
- *      nên nhìn không giống nhau.
+ *   4. Mỗi khuôn vẽ bằng InstancedMesh: GPU vẽ NHIỀU đảo cùng khuôn chỉ bằng
+ *      1 lệnh vẽ (draw call), mỗi đảo có vị trí/xoay/tỉ lệ riêng nên nhìn không
+ *      giống nhau. (5 khuôn × 2 mức chi tiết = tối đa 10 lệnh vẽ cho 60 đảo.)
  *   5. LOD (Level of Detail – mức chi tiết): mỗi khuôn có 2 bản, bản "gần"
  *      nhiều tam giác và bản "xa" ít tam giác. Đảo ở xa (đã mờ trong sương)
  *      dùng bản xa → GPU đỡ việc mà mắt không nhận ra khác biệt.
@@ -53,7 +53,7 @@
     // Bồ Hòn: khối núi lớn, dài, 2 đỉnh. Đảo to → ngấn sóng mỏng/nông lại (ngấn thật chỉ sâu 1–2 m)
     'bo-hon': { cao: 1.6, vomTu: 0.5, thon: 0.04, nghieng: 0.05, haiDinh: true, ngan: 0.04, dayNgan: 0.025, goGhe: 1.5 },
     // Gà Chọi: thân thắt lại ở chân (ngấn sóng rất sâu), phình ra ở trên, nghiêng vào nhau
-    'ga-choi': { cao: 4.4, vomTu: 0.86, thon: -0.25, nghieng: 0.9, ngan: 0.3 }
+    'ga-choi': { cao: 4.4, vomTu: 0.86, thon: -0.25, nghieng: 0.55, ngan: 0.3 }
   };
 
   // Số đỉnh của từng mức chi tiết
@@ -287,7 +287,9 @@
     for (i = 0; i < NA; i++) {
       for (j = 0; j < NR; j++) {
         var p = i * (NR + 1) + j, q = p + NR + 1;
-        chiSo.push(p, p + 1, q, q, p + 1, q + 1);
+        // Thứ tự đỉnh NGƯỢC chiều kim đồng hồ khi nhìn từ trên xuống → mặt trước
+        // hướng lên trời (three.js mặc định bỏ không vẽ mặt sau)
+        chiSo.push(p, q, p + 1, q, q + 1, p + 1);
       }
     }
     var hinh = new THREE.BufferGeometry();
@@ -316,10 +318,15 @@
       new THREE.Vector3(x, 0, z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), xoay),
       new THREE.Vector3(s * sx, s * sy, s * sz));
-    var rChan = s * hinh.userData.banKinhChan * Math.max(sx, sz);
+    var bk = s * hinh.userData.banKinhChan;
+    var rChan = bk * Math.max(sx, sz);           // bán kính lớn nhất (để chừa chỗ, chừa luồng)
     var cao = s * sy * hinh.userData.caoDinh;
     hinh.applyMatrix4(mt);
-    return { hinh: hinh, x: x, z: z, rChan: rChan, cao: cao };
+    return {
+      hinh: hinh, x: x, z: z, rChan: rChan, cao: cao,
+      rX: bk * sx, rZ: bk * sz, xoay: xoay,      // 2 bán trục elip + góc xoay (để xét va chạm)
+      rPhanChieu: bk * Math.sqrt(sx * sz)        // bán kính "trung bình" cho bóng phản chiếu
+    };
   }
 
   function taoDaoNoiBat(noise) {
@@ -351,7 +358,7 @@
         // 2 hòn đá đứng 2 bên, trục nối 2 hòn vuông góc với hướng nhìn từ điểm dừng
         var trucX = -Math.sin(gocToiDiemDung), trucZ = Math.cos(gocToiDiemDung);
         [[-1, 2.6], [1, 2.3]].forEach(function (ben) {
-          var x = vt.x + trucX * ben[0] * 3.6, z = vt.z + trucZ * ben[0] * 3.6;
+          var x = vt.x + trucX * ben[0] * 4.5, z = vt.z + trucZ * ben[0] * 4.5;
           var hatRieng = taoHat(rand);
           hatRieng.huongNghieng = Math.atan2(-trucZ * ben[0], -trucX * ben[0]);   // nghiêng về phía hòn kia
           hatRieng.bac = [];
@@ -428,7 +435,7 @@
       var tatCa = noiBat.dsDao.concat(dsDao);
       HALONG.dsDao = tatCa;
       HALONG.vatCan = HALONG.vatCan.concat(tatCa.map(function (dao) {
-        return { x: dao.x, z: dao.z, r: dao.rChan, cao: dao.cao };
+        return { x: dao.x, z: dao.z, r: dao.rChan, rX: dao.rX, rZ: dao.rZ, xoay: dao.xoay, cao: dao.cao };
       }));
 
       this.viTriCam = new THREE.Vector3();
@@ -459,7 +466,8 @@
           else nh.xa.setMatrixAt(nXa++, dao.maTran);
         });
         nh.gan.count = nGan; nh.xa.count = nXa;
-        nh.gan.visible = nGan > 0; nh.xa.visible = nXa > 0;   // count = 0 vẫn tốn 1 draw call → ẩn hẳn
+        // count = 0 thì three.js không vẽ, nhưng vẫn duyệt và chuẩn bị shader cho vật thể → ẩn hẳn cho gọn
+        nh.gan.visible = nGan > 0; nh.xa.visible = nXa > 0;
         nh.gan.instanceMatrix.needsUpdate = true;
         nh.xa.instanceMatrix.needsUpdate = true;
       });
@@ -534,6 +542,8 @@
 
         ds.push({
           x: x, z: z, kieu: kieu, s: s, sx: sx, sy: sy, sz: sz, xoay: xoay, rChan: rChan,
+          rX: rChan / Math.max(sx, sz) * sx, rZ: rChan / Math.max(sx, sz) * sz,
+          rPhanChieu: rChan / Math.max(sx, sz) * Math.sqrt(sx * sz),
           cao: s * sy * khuon[kieu].gan.userData.caoDinh
         });
       }

@@ -8,7 +8,7 @@
  * ========================================================================= */
 
 :root {
-  --nen-khung: rgba(20, 16, 40, 0.62);   /* nền tím than trong mờ */
+  --nen-khung: rgba(20, 16, 40, 0.78);   /* nền tím than hơi trong */
   --vien-khung: rgba(255, 190, 130, 0.35);
   --chu: #fdf3e7;
   --chu-phu: #f3c9a0;
@@ -31,8 +31,8 @@ html, body {
   background: var(--nen-khung);
   border: 1px solid var(--vien-khung);
   border-radius: 12px;
-  backdrop-filter: blur(6px);             /* làm mờ cảnh phía sau cho dễ đọc chữ */
-  -webkit-backdrop-filter: blur(6px);
+  /* Không dùng backdrop-filter: blur cho các khung luôn hiện: khung 3D đổi mỗi khung
+     hình nên trình duyệt phải làm mờ lại liên tục → tốn GPU tích hợp. */
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
   user-select: none;
   pointer-events: none;                   /* không chặn thao tác kéo chuột lên cảnh */
@@ -73,7 +73,10 @@ kbd {
   min-width: 18px;
   margin-right: 3px;
   padding: 0 5px;
-  font: 600 12px/20px inherit;
+  font-family: inherit;                   /* 'inherit' không được viết trong font: viết tắt */
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 20px;
   text-align: center;
   color: #2a1d3d;
   background: #fde7cf;
@@ -119,6 +122,11 @@ kbd {
   text-align: center;
   transform: translateX(-50%);
   transition: opacity 0.6s, transform 0.6s;
+}
+#bang-diem-dung {
+  /* Riêng bảng điểm dừng (chỉ hiện lúc neo) mới làm mờ nền cho đẹp */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 #bang-diem-dung.an {
   opacity: 0;

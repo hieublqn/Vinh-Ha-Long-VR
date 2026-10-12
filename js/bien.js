@@ -111,6 +111,12 @@
     return h;
   };
 
+  // Bán kính hình trụ dùng cho bóng phản chiếu của 1 đảo: bán kính "trung bình" của
+  // hình elip chân đảo (không lấy bán trục lớn → đảo dẹt không bị bóng tràn ra mặt nước)
+  HALONG.banKinhPhanChieu = function (dao) {
+    return dao.rPhanChieu ? dao.rPhanChieu * 0.9 : dao.rChan * 0.85;
+  };
+
   // Viết số kiểu GLSL (luôn có dấu chấm thập phân: 41 → "41.0")
   function soGLSL(x) {
     var chu = String(+x.toFixed(4));
@@ -137,7 +143,7 @@
     '}'
   ].join('\n');
 
-  var SO_DAO_PHAN_CHIEU = 12;   // số đảo gần nhất được tính bóng phản chiếu
+  var SO_DAO_PHAN_CHIEU = 12;   // tối đa 12 đảo (to nhất trong tầm nhìn) được tính bóng phản chiếu
 
   var DINH_SHADER_BIEN = [
     GLSL_SONG,
@@ -179,7 +185,7 @@
     '  vec2 huongNangNgang = normalize(uHuongMatTroi.xz + vec2(1e-5));',
     '  for (int i = 0; i < SO_DAO_PC; i++) {',
     '    vec4 dao = uDaoGan[i];',
-    '    if (dao.z <= 0.0) continue;           // ô trống',
+    '    if (dao.z <= 0.0) break;              // hết đảo (các ô có đảo luôn xếp ở đầu mảng)',
     '    vec2 oc = P.xz - dao.xy;',
     '    float b = dot(oc, Rn);',
     '    if (b >= 0.0) continue;               // đảo nằm phía sau tia',
@@ -213,9 +219,12 @@
     '// Đổi điểm nước sang hệ tọa độ của thuyền (dọc thân / ngang thân) rồi vẽ:',
     '//  - 2 cánh sóng chữ V (góc Kelvin ≈ 19.5°: góc này giống nhau với MỌI con thuyền)',
     '//  - vệt nước xáo trộn ngay sau đuôi, bọt dọc 2 mạn và sóng mũi',
-    'float botThuyen(vec2 p) {',
-    '  if (uThuyen.w < 0.01) return 0.0;',
+    '// dpx, dpy: độ biến thiên của p giữa 2 điểm ảnh kề nhau (tính sẵn ở main) – cần cho',
+    '// textureGrad vì sau các lệnh "return sớm" GPU không tự tính được giá trị này.',
+    'float botThuyen(vec2 p, vec2 dpx, vec2 dpy) {',
+    '  if (uThuyen.w < 0.01) return 0.0;      // thuyền đang neo: không có vệt sóng',
     '  vec2 rel = p - uThuyen.xy;',
+    '  if (dot(rel, rel) > 140.0 * 140.0) return 0.0;   // xa thuyền quá 140 m: khỏi tính',
     '  float s = sin(uThuyen.z), c = cos(uThuyen.z);',
     '  vec2 truoc = vec2(-s, -c);             // hướng mũi thuyền',
     '  vec2 phai = vec2(c, -s);               // hướng mạn phải',
@@ -232,16 +241,17 @@
     '    float giua = ngang / (2.0 + sau * 0.06);',
     '    bot += exp(-giua * giua) * exp(-sau / 20.0) * 0.85;',
     '  }',
-    '  // bọt dọc 2 mạn (thân rộng nhất ~2.8 m, thon dần về mũi)',
+    '  // bọt dọc 2 mạn (nửa bề rộng thân ~2.8 m, tức thân rộng ~5.6 m, thon dần về mũi)',
     '  float nuaRong = 2.9 * sqrt(clamp((11.5 - doc) / 8.0, 0.0, 1.0));',
     '  float man = (abs(ngang) - nuaRong) / 0.7;',
     '  bot += exp(-man * man) * (1.0 - smoothstep(9.0, 12.0, abs(doc - 0.5))) * 0.55;',
     '  // sóng mũi',
     '  vec2 mui = vec2(ngang, doc - 11.0);',
     '  bot += exp(-dot(mui, mui) / 4.0) * 0.6;',
+    '  if (bot < 0.004) return 0.0;           // gần như không có bọt: bỏ qua 2 lần đọc texture',
     '  // xé lẻ bọt bằng noise để không thành vệt trơn',
-    '  float vun = texture2D(uBanDoGon, p * 0.23 + vec2(0.0, uThoiGian * 0.02)).r',
-    '            * texture2D(uBanDoGon, p * 0.071 - vec2(uThoiGian * 0.01, 0.0)).g;',
+    '  float vun = textureGrad(uBanDoGon, p * 0.23 + vec2(0.0, uThoiGian * 0.02), dpx * 0.23, dpy * 0.23).r',
+    '            * textureGrad(uBanDoGon, p * 0.071 - vec2(uThoiGian * 0.01, 0.0), dpx * 0.071, dpy * 0.071).g;',
     '  bot *= smoothstep(0.12, 0.42, vun + bot * 0.15);',
     '  return clamp(bot * uThuyen.w, 0.0, 1.0);',
     '}',
@@ -284,7 +294,7 @@
     '  vec3 mau = mix(thanNuoc, phanChieu, fresnel) + uMauNang * lapLanh;',
     '',
     '  // 6) Bọt sóng của thuyền: trắng, nhận ánh sáng trời + nắng',
-    '  float bot = botThuyen(vViTri.xz);',
+    '  float bot = botThuyen(vViTri.xz, dFdx(vViTri.xz), dFdy(vViTri.xz));',
     '  mau = mix(mau, uMauGiuaTroi * 0.9 + uMauNang * 0.35, bot * 0.85);',
     '',
     '  // 7) Sương mù xa: hòa vào màu chân trời đúng hướng nhìn',
@@ -335,6 +345,7 @@
       this.viTriCam = new THREE.Vector3();
       this.demKhung = 0;
       this.sapXep = [];                        // mảng tạm để sắp xếp đảo (tái sử dụng, đỡ rác bộ nhớ)
+      this.huongNhin = new THREE.Vector3();
     },
 
     tick: function () {
@@ -344,27 +355,40 @@
       var b = this.buocLuoi;
       this.mat.position.set(Math.round(this.viTriCam.x / b) * b, 0, Math.round(this.viTriCam.z / b) * b);
 
-      // Cứ 10 khung hình chọn lại 12 đảo để tính bóng phản chiếu
-      if (this.demKhung++ % 10 === 0) this.chonDaoGan();
+      // Cứ 4 khung hình chọn lại các đảo để tính bóng phản chiếu (rất nhẹ, ~vài micro giây)
+      if (this.demKhung++ % 4 === 0) this.chonDaoGan();
     },
 
-    // Chọn 12 đảo "to nhất trong mắt người xem": điểm = kích thước / khoảng cách.
+    // Chọn tối đa 12 đảo "to nhất trong mắt người xem": điểm = kích thước / khoảng cách.
     // (chọn theo gần nhất thì vài đảo nhỏ sát bên sẽ chiếm chỗ của đảo lớn ở xa hơn)
+    // Đảo nằm lệch quá ~100° so với hướng nhìn thì bóng của nó không thể rơi vào phần
+    // mặt nước đang thấy → bỏ, để GPU không phải dò tia vô ích cho mỗi điểm ảnh.
     chonDaoGan: function () {
       var ds = HALONG.dsDao || [];
-      var cam = this.viTriCam, mang = this.sapXep;
+      var cam = this.viTriCam, mang = this.sapXep, f = this.huongNhin;
+      this.el.sceneEl.camera.getWorldDirection(f);
+      f.y = 0;
+      var coHuong = f.lengthSq() > 0.05;            // nhìn thẳng xuống/lên thì không lọc
+      if (coHuong) f.normalize();
       for (var i = 0; i < ds.length; i++) {
         var dao = ds[i];
+        var dx = dao.x - cam.x, dz = dao.z - cam.z, kc = Math.hypot(dx, dz);
+        var r = HALONG.banKinhPhanChieu(dao);
+        var diem = (dao.cao + r) / Math.max(kc - r, 1);
+        if (coHuong && kc > r + 1) {
+          var lech = Math.acos(Math.min(Math.max((dx * f.x + dz * f.z) / kc, -1), 1)) - Math.asin(r / kc);
+          if (lech > 1.75) diem = 0;                  // 1.75 rad ≈ 100°
+        }
         if (!mang[i]) mang[i] = { dao: null, diem: 0 };
         mang[i].dao = dao;
-        mang[i].diem = (dao.cao + dao.rChan) / Math.max(Math.hypot(dao.x - cam.x, dao.z - cam.z) - dao.rChan, 1);
+        mang[i].diem = diem;
       }
       mang.length = ds.length;
       mang.sort(function (a, b) { return b.diem - a.diem; });
+      // Xếp các đảo được chọn vào ĐẦU mảng; ô còn lại = 0 → shader gặp ô 0 là dừng (break)
       for (i = 0; i < SO_DAO_PHAN_CHIEU; i++) {
         var o = mang[i];
-        // Bán kính lấy 85% chân đảo (đảo không tròn đều, lấy nhỏ hơn cho đỡ "lố" ra mép)
-        if (o) this.daoGan[i].set(o.dao.x, o.dao.z, o.dao.rChan * 0.85, o.dao.cao * 0.92);
+        if (o && o.diem > 0) this.daoGan[i].set(o.dao.x, o.dao.z, HALONG.banKinhPhanChieu(o.dao), o.dao.cao * 0.92);
         else this.daoGan[i].set(0, 0, 0, 0);
       }
     },

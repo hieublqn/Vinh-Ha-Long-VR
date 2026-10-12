@@ -41,6 +41,13 @@ Bản đồ trong mô hình là **minh họa**: vị trí các điểm không đ
 Góc dưới bên trái là bảng **FPS · Draw call · Tam giác** để tự kiểm tra hiệu năng
 (chữ chuyển đỏ khi FPS dưới 45).
 
+Ghi chú:
+- Phím `F` (mặc định của A-Frame để vào VR) đã được tắt: trên máy không có kính, nó chỉ làm
+  khung 3D toàn màn hình và che mất các bảng thông tin.
+- Nút kính VR ở góc phải chỉ hiện khi trình duyệt hỗ trợ WebXR "immersive-vr" (có kính VR).
+- Bảng điểm dừng chỉ hiện ở chế độ Du thuyền; khi đeo kính, bảng HTML không hiển thị
+  (Mốc 4 sẽ có bảng thuyết minh 3D trong không gian).
+
 ## Cấu trúc thư mục
 
 ```
