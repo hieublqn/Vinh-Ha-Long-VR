@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+  index.html – KHUNG CẢNH CHÍNH "VỊNH HẠ LONG VR – DU THUYỀN HOÀNG HÔN"
+  -------------------------------------------------------------------------
+  - Nạp A-Frame (bản local trong lib/, thiếu thì tải từ CDN).
+  - Nạp các file component trong js/ (mỗi file 1 phần của khung cảnh).
+  - Khai báo khung cảnh bằng thẻ HTML: <a-scene> chứa các <a-entity>,
+    mỗi entity gắn component tương ứng (bau-troi, bien, dao-da-voi...).
+  Chạy: nhấp đúp file này, hoặc mở bằng VS Code Live Server.
+========================================================================== -->
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Vịnh Hạ Long VR – Du thuyền hoàng hôn</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <!-- favicon rỗng: tránh trình duyệt đi tìm favicon.ico (lỗi 404 trong console) -->
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- 1) A-Frame 1.6.0: ưu tiên file local để chạy offline -->
+  <script src="lib/aframe.min.js"></script>
+  <script>
+    // Nếu thiếu file local (window.AFRAME chưa có) → tải từ CDN chính thức
+    if (!window.AFRAME) {
+      document.write('<script src="https://aframe.io/releases/1.6.0/aframe.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- 2) Các component tự viết. Thứ tự quan trọng: tien-ich.js phải đứng đầu -->
+  <script src="js/tien-ich.js"></script>
+  <script src="js/bau-troi.js"></script>
+  <script src="js/bien.js"></script>
+  <script src="js/dao-da-voi.js"></script>
+  <script src="js/dieu-khien.js"></script>
+  <script src="js/giao-dien.js"></script>
+</head>
+<body>
+  <!--
+    renderer:
+      antialias      : khử răng cưa
+      alpha: false   : canvas không trong suốt (trình duyệt đỡ phải trộn với trang web)
+      physicallyCorrectLights: đơn vị ánh sáng vật lý (chuẩn mới của three.js)
+      toneMapping    : ACESFilmic – nén vùng quá sáng (mặt trời) cho giống ảnh chụp
+    light="defaultLightsEnabled: false": tắt đèn mặc định của A-Frame, dùng đèn
+      riêng do bau-troi.js tạo.
+  -->
+  <a-scene
+    renderer="antialias: true; alpha: false; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.1"
+    light="defaultLightsEnabled: false"
+    vr-mode-ui="enabled: true"
+    loading-screen="dotsColor: #ffb26b; backgroundColor: #1b1530"
+    giao-dien>
+
+    <!-- Bầu trời hoàng hôn + mặt trời + ánh sáng -->
+    <a-entity id="bau-troi" bau-troi="cheDo: hoangHon"></a-entity>
+
+    <!-- Mặt biển có sóng -->
+    <a-entity id="mat-bien" bien></a-entity>
+
+    <!-- Quần đảo đá vôi (Mốc 1: ít đảo; Mốc 2: 40–80 đảo) -->
+    <a-entity id="quan-dao" dao-da-voi="soDao: 16; hatGiong: 1994"></a-entity>
+
+    <!-- Người dùng: rig (để di chuyển) chứa camera (để nhìn quanh).
+         Rig cao 1 m trên mặt nước, camera cao thêm 1.6 m (tầm mắt). -->
+    <a-entity id="rig" position="0 1 60" dieu-khien>
+      <a-entity id="camera" position="0 1.6 0"
+                camera="near: 0.1; far: 4000"
+                look-controls="pointerLockEnabled: false; magicWindowTrackingEnabled: true"></a-entity>
+    </a-entity>
+  </a-scene>
+</body>
+</html>

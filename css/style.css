@@ -1,0 +1,101 @@
+/* =========================================================================
+ * style.css – GIAO DIỆN HTML NẰM ĐÈ LÊN KHUNG CẢNH 3D (HUD)
+ * -------------------------------------------------------------------------
+ * Mốc 1: bảng hướng dẫn phím + bảng thông số hiệu năng.
+ * Mốc 4 sẽ thêm: màn hình chờ, menu, minimap, bảng thuyết minh.
+ * Chỉ dùng font có sẵn trong máy (không tải font ngoài → chạy offline).
+ * ========================================================================= */
+
+:root {
+  --nen-khung: rgba(20, 16, 40, 0.62);   /* nền tím than trong mờ */
+  --vien-khung: rgba(255, 190, 130, 0.35);
+  --chu: #fdf3e7;
+  --chu-phu: #f3c9a0;
+  --nhan: #ffb26b;                        /* màu nhấn: cam hoàng hôn */
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1b1530;                    /* màu nền trong lúc A-Frame đang tải */
+  font-family: "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Khung chung cho mọi bảng HUD */
+.hud-khung {
+  position: fixed;
+  z-index: 10;
+  color: var(--chu);
+  background: var(--nen-khung);
+  border: 1px solid var(--vien-khung);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);             /* làm mờ cảnh phía sau cho dễ đọc chữ */
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  pointer-events: none;                   /* không chặn thao tác kéo chuột lên cảnh */
+}
+
+/* Bảng hướng dẫn – góc trên bên trái */
+#bang-huong-dan {
+  top: 16px;
+  left: 16px;
+  padding: 14px 18px 12px;
+  max-width: 280px;
+  transition: opacity 0.3s, transform 0.3s;
+}
+#bang-huong-dan.an {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+#bang-huong-dan h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+  color: var(--nhan);
+}
+#bang-huong-dan .phu-de {
+  margin: 2px 0 10px;
+  font-size: 13px;
+  color: var(--chu-phu);
+}
+#bang-huong-dan ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.9;
+}
+kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin-right: 3px;
+  padding: 0 5px;
+  font: 600 12px/20px inherit;
+  text-align: center;
+  color: #2a1d3d;
+  background: #fde7cf;
+  border-radius: 4px;
+  box-shadow: 0 2px 0 #c8916a;
+}
+
+/* Bảng thông số hiệu năng – góc dưới bên trái */
+#bang-thong-so {
+  left: 16px;
+  bottom: 16px;
+  padding: 6px 12px;
+  font: 600 13px/1.4 Consolas, "Courier New", monospace;
+}
+#bang-thong-so.cham {
+  color: #ff8f8f;                         /* dưới 45 FPS → chữ đỏ */
+}
+
+/* Màn hình hẹp (điện thoại): thu nhỏ bảng hướng dẫn */
+@media (max-width: 600px) {
+  #bang-huong-dan {
+    max-width: 200px;
+    padding: 10px 12px;
+  }
+  #bang-huong-dan ul { font-size: 12px; line-height: 1.7; }
+}
