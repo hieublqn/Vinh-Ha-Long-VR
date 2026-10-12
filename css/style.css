@@ -2,6 +2,7 @@
  * style.css – GIAO DIỆN HTML NẰM ĐÈ LÊN KHUNG CẢNH 3D (HUD)
  * -------------------------------------------------------------------------
  * Mốc 1: bảng hướng dẫn phím + bảng thông số hiệu năng.
+ * Mốc 2: chip chế độ (Du thuyền / Tự do) + bảng điểm dừng.
  * Mốc 4 sẽ thêm: màn hình chờ, menu, minimap, bảng thuyết minh.
  * Chỉ dùng font có sẵn trong máy (không tải font ngoài → chạy offline).
  * ========================================================================= */
@@ -91,6 +92,55 @@ kbd {
   color: #ff8f8f;                         /* dưới 45 FPS → chữ đỏ */
 }
 
+/* Chip chế độ – giữa, phía trên */
+#chip-che-do {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  font-size: 14px;
+  white-space: nowrap;
+  border-radius: 999px;
+}
+#chip-che-do b { color: var(--nhan); }
+#chip-che-do .goi-y {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--chu-phu);
+}
+
+/* Bảng điểm dừng – giữa, dưới chip */
+#bang-diem-dung {
+  top: 64px;
+  left: 50%;
+  width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 20px 14px;
+  text-align: center;
+  transform: translateX(-50%);
+  transition: opacity 0.6s, transform 0.6s;
+}
+#bang-diem-dung.an {
+  opacity: 0;
+  transform: translate(-50%, -10px);
+}
+#bang-diem-dung .nhan {
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--chu-phu);
+}
+#bang-diem-dung h2 {
+  margin: 2px 0 6px;
+  font-size: 24px;
+  color: var(--nhan);
+}
+#bang-diem-dung p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 /* Màn hình hẹp (điện thoại): thu nhỏ bảng hướng dẫn */
 @media (max-width: 600px) {
   #bang-huong-dan {
@@ -98,4 +148,7 @@ kbd {
     padding: 10px 12px;
   }
   #bang-huong-dan ul { font-size: 12px; line-height: 1.7; }
+  #chip-che-do { top: auto; bottom: 64px; font-size: 12px; }
+  #chip-che-do .goi-y { display: none; }
+  #bang-diem-dung { top: auto; bottom: 110px; }
 }

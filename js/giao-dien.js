@@ -2,11 +2,14 @@
  * giao-dien.js – GIAO DIỆN TRÊN MÀN HÌNH (HUD) (component "giao-dien")
  * -------------------------------------------------------------------------
  * HUD = các khung HTML nằm đè lên khung cảnh 3D (không nằm trong thế giới 3D).
- * Mốc 1 có:
+ * Hiện có:
  *   - Bảng hướng dẫn phím (phím H để ẩn/hiện).
+ *   - Chip chế độ (Du thuyền / Tự do) + điểm dừng kế tiếp và khoảng cách.
+ *   - Bảng điểm dừng: hiện khi thuyền neo ở điểm tham quan.
  *   - Bảng thông số hiệu năng: FPS, số draw call, số tam giác
  *     → để tự đo xem máy có chạy mượt không.
- * Mốc 4–5 sẽ thêm: minimap, menu, nút Ngày/Hoàng hôn/Đêm, chọn chất lượng.
+ * Mốc 4–5 sẽ thêm: minimap, menu, nút Ngày/Hoàng hôn/Đêm, chọn chất lượng,
+ * bảng thuyết minh 3D trong không gian.
  * ========================================================================= */
 (function () {
   'use strict';
@@ -26,11 +29,33 @@
         '<li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi lại</li>',
         '<li><b>Giữ chuột + kéo</b> để xoay</li>',
         '<li><kbd>Shift</kbd> đi nhanh</li>',
-        '<li><kbd>Space</kbd> / <kbd>C</kbd> bay lên / xuống</li>',
+        '<li><kbd>M</kbd> đổi chế độ Du thuyền / Tự do</li>',
+        '<li><kbd>Space</kbd> / <kbd>C</kbd> bay lên / xuống (Tự do)</li>',
+        '<li><kbd>N</kbd> rời điểm dừng ngay</li>',
         '<li><kbd>H</kbd> ẩn / hiện bảng này</li>',
         '</ul>'
       ].join('');
       document.body.appendChild(this.bangHuongDan);
+
+      // --- Chip chế độ + điểm kế tiếp (giữa, phía trên) ---
+      this.chipCheDo = document.createElement('div');
+      this.chipCheDo.id = 'chip-che-do';
+      this.chipCheDo.className = 'hud-khung';
+      document.body.appendChild(this.chipCheDo);
+
+      // --- Bảng điểm dừng (giữa, phía dưới chip) ---
+      this.bangDiemDung = document.createElement('div');
+      this.bangDiemDung.id = 'bang-diem-dung';
+      this.bangDiemDung.className = 'hud-khung an';
+      document.body.appendChild(this.bangDiemDung);
+
+      var sceneEl = this.el;
+      this.khiDenDiemDung = this.hienDiemDung.bind(this);
+      this.khiRoiDiemDung = function () { this.bangDiemDung.classList.add('an'); }.bind(this);
+      this.khiDoiCheDo = this.capNhatChip.bind(this);
+      sceneEl.addEventListener('den-diem-dung', this.khiDenDiemDung);
+      sceneEl.addEventListener('roi-diem-dung', this.khiRoiDiemDung);
+      sceneEl.addEventListener('doi-che-do', this.khiDoiCheDo);
 
       // --- Bảng thông số hiệu năng ---
       this.bangThongSo = document.createElement('div');
@@ -50,8 +75,41 @@
 
     remove: function () {
       window.removeEventListener('keydown', this.khiNhanPhim);
-      this.bangHuongDan.remove();
-      this.bangThongSo.remove();
+      this.el.removeEventListener('den-diem-dung', this.khiDenDiemDung);
+      this.el.removeEventListener('roi-diem-dung', this.khiRoiDiemDung);
+      this.el.removeEventListener('doi-che-do', this.khiDoiCheDo);
+      [this.bangHuongDan, this.bangThongSo, this.chipCheDo, this.bangDiemDung].forEach(function (el) { el.remove(); });
+    },
+
+    // Bảng tên + mô tả ngắn của điểm dừng (Mốc 4 sẽ thay bằng bảng 3D đầy đủ)
+    hienDiemDung: function (e) {
+      var dd = e.detail.diem, tong = HALONG.LO_TRINH.diemDung.length;
+      this.bangDiemDung.innerHTML = '';
+      var nhan = document.createElement('div');
+      nhan.className = 'nhan';
+      nhan.textContent = 'Điểm dừng ' + (e.detail.chiSo + 1) + '/' + tong;
+      var ten = document.createElement('h2');
+      ten.textContent = dd.ten;
+      var moTa = document.createElement('p');
+      moTa.textContent = dd.moTa;
+      this.bangDiemDung.append(nhan, ten, moTa);
+      this.bangDiemDung.classList.remove('an');
+    },
+
+    // Nội dung chip: chế độ hiện tại + điểm kế tiếp / thời gian còn neo
+    capNhatChip: function () {
+      var dk = document.querySelector('[dieu-khien]');
+      var cheDo = dk ? dk.getAttribute('dieu-khien').cheDo : 'tu-do';
+      var tt = HALONG.thuyen, chu;
+      if (cheDo === 'du-thuyen' && tt) {
+        var tiep = HALONG.LO_TRINH.diemDung[tt.diemTiep];
+        chu = tt.trangThai === 'dung'
+          ? 'Đang neo · rời bến sau ' + Math.ceil(tt.cho) + ' giây'
+          : 'Tiếp theo: ' + tiep.ten + ' · ' + Math.round(tt.conLai) + ' m';
+        this.chipCheDo.innerHTML = '<b>Du thuyền</b> · ' + chu + ' <span class="goi-y">M: tự do</span>';
+      } else {
+        this.chipCheDo.innerHTML = '<b>Tự do</b> · bay khám phá vịnh <span class="goi-y">M: lên thuyền</span>';
+      }
     },
 
     tick: function (t, dt) {
@@ -70,6 +128,7 @@
         'FPS ' + tk.fps + '  ·  Draw call ' + tk.drawCall +
         '  ·  Tam giác ' + Math.round(tk.tamGiac / 1000) + 'k';
       this.bangThongSo.classList.toggle('cham', tk.fps < 45);   // đỏ khi dưới mục tiêu 45 FPS
+      this.capNhatChip();
 
       this.soKhung = 0;
       this.thoiGianDem = 0;

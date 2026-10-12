@@ -30,6 +30,7 @@
   <script src="js/tien-ich.js"></script>
   <script src="js/bau-troi.js"></script>
   <script src="js/bien.js"></script>
+  <script src="js/thuyen.js"></script>      <!-- trước dao-da-voi.js: đảo cần biết lộ trình để chừa luồng -->
   <script src="js/dao-da-voi.js"></script>
   <script src="js/dieu-khien.js"></script>
   <script src="js/giao-dien.js"></script>
@@ -57,12 +58,18 @@
     <!-- Mặt biển có sóng -->
     <a-entity id="mat-bien" bien></a-entity>
 
-    <!-- Quần đảo đá vôi (Mốc 1: ít đảo; Mốc 2: 40–80 đảo) -->
-    <a-entity id="quan-dao" dao-da-voi="soDao: 16; hatGiong: 1994"></a-entity>
+    <!-- Quần đảo đá vôi: 60 đảo ngẫu nhiên (có seed) + các đảo nổi bật theo lộ trình -->
+    <a-entity id="quan-dao" dao-da-voi="soDao: 60; hatGiong: 1994"></a-entity>
+
+    <!-- Thuyền buồm + du thuyền tự động theo lộ trình.
+         Đặt TRƯỚC rig: mỗi khung hình thuyền di chuyển trước, rồi rig mới bám theo
+         (nếu ngược lại, người đứng trên boong sẽ bị trễ 1 khung hình → rung). -->
+    <a-entity id="thuyen" thuyen-buom du-thuyen></a-entity>
 
     <!-- Người dùng: rig (để di chuyển) chứa camera (để nhìn quanh).
-         Rig cao 1 m trên mặt nước, camera cao thêm 1.6 m (tầm mắt). -->
-    <a-entity id="rig" position="0 1 60" dieu-khien>
+         Chế độ "du-thuyen": rig đứng trên boong, đi theo thuyền.
+         Camera cao 1.6 m so với chân (tầm mắt). -->
+    <a-entity id="rig" dieu-khien="cheDo: du-thuyen">
       <a-entity id="camera" position="0 1.6 0"
                 camera="near: 0.1; far: 4000"
                 look-controls="pointerLockEnabled: false; magicWindowTrackingEnabled: true"></a-entity>

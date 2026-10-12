@@ -94,11 +94,13 @@
 
     // Noise 2D LẶP LẠI với chu kỳ 'chuKy' ô (tileable): mép trái khớp mép phải,
     // mép trên khớp mép dưới → dán texture cạnh nhau không thấy đường nối.
-    function n2Lap(x, y, chuKy) {
+    // chuKyY (không bắt buộc): chu kỳ theo trục y khác trục x → noise bị "kéo dãn"
+    function n2Lap(x, y, chuKy, chuKyY) {
+      var cx = chuKy, cy = chuKyY || chuKy;
       var xi = Math.floor(x), yi = Math.floor(y);
       var u = lamMuot(x - xi), v = lamMuot(y - yi);
       function g(i, j) {
-        return bam(((i % chuKy) + chuKy) % chuKy, ((j % chuKy) + chuKy) % chuKy, chuKy, seed);
+        return bam(((i % cx) + cx) % cx, ((j % cy) + cy) % cy, cx * 1000 + cy, seed);
       }
       return noiSuy(noiSuy(g(xi, yi), g(xi + 1, yi), u),
                     noiSuy(g(xi, yi + 1), g(xi + 1, yi + 1), u), v);
@@ -147,7 +149,8 @@
     uMauNang:      { value: new THREE.Color() },          // màu × cường độ ánh nắng
     uMauNuocSau:   { value: new THREE.Color() },          // màu nước sâu
     uMauNuocNong:  { value: new THREE.Color() },          // màu xanh ngọc khi nắng xuyên sóng
-    uMatDoSuong:   { value: 0.004 }                       // độ dày sương mù
+    uMatDoSuong:   { value: 0.004 },                      // độ dày sương mù
+    uThuyen:       { value: new THREE.Vector4() }         // thuyền: x, z, góc hướng, tốc độ (0..1)
   };
 
   /* -----------------------------------------------------------------------
@@ -211,31 +214,65 @@
   ].join('\n');
 
   /* -----------------------------------------------------------------------
-   * 6. GẮN SƯƠNG MÙ THEO HƯỚNG vào vật liệu có sẵn (MeshLambertMaterial...)
-   *    three.js cho phép sửa shader trước khi biên dịch qua onBeforeCompile.
-   *    Ta chèn thêm: tính vị trí thế giới của điểm ảnh → khoảng cách tới
-   *    camera → trộn với màu sương. Làm TRƯỚC bước tone mapping để cùng
-   *    "không gian màu" với shader bầu trời (nếu không sẽ lệch màu).
+   * 6. "VÁ" SHADER CỦA VẬT LIỆU CÓ SẴN (MeshLambertMaterial...)
+   *    three.js cho phép sửa mã shader ngay trước khi biên dịch, qua hàm
+   *    onBeforeCompile. Ta dùng nó để:
+   *      - luôn thêm SƯƠNG MÙ THEO HƯỚNG (trộn trước bước tone mapping để cùng
+   *        "không gian màu" với shader bầu trời, nếu không sẽ lệch màu);
+   *      - phần nằm DƯỚI mặt nước tối dần theo độ sâu (nước hấp thụ ánh sáng);
+   *      - tính sẵn vị trí + pháp tuyến trong THẾ GIỚI (vViTriTheGioi,
+   *        vPhapTuyenTG) cho các hiệu ứng riêng;
+   *      - chèn thêm đoạn GLSL riêng của từng loại vật liệu:
+   *          dinhKhaiBao / manhKhaiBao : khai báo thêm (uniform, hàm...)
+   *          manhSauMau   : chạy ngay sau khi có màu gốc (diffuseColor)
+   *          manhTruocSuong : chạy sau khi tính ánh sáng, trước sương mù
+   *          uniforms     : uniform riêng
+   *          ten          : tên duy nhất cho mỗi kiểu vá (bắt buộc khác nhau!)
+   *    Vì sao cần "ten"? three.js dùng chung chương trình shader đã biên dịch
+   *    cho các vật liệu có cùng "khóa". Mặc định khóa = mã nguồn hàm
+   *    onBeforeCompile – mà mọi vật liệu đều dùng CHUNG hàm dưới đây, nên phải
+   *    tự đặt khóa khác nhau, nếu không đảo sẽ bị dùng nhầm shader của buồm.
    * --------------------------------------------------------------------- */
-  HALONG.apDungSuongMu = function (vatLieu) {
+  HALONG.vaShader = function (vatLieu, tuyChon) {
+    tuyChon = tuyChon || {};
     vatLieu.onBeforeCompile = function (shader) {
-      Object.assign(shader.uniforms, HALONG.uniformChung);
+      Object.assign(shader.uniforms, HALONG.uniformChung, tuyChon.uniforms || {});
 
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vViTriTheGioi;')
+        .replace('#include <common>', [
+          '#include <common>',
+          'varying vec3 vViTriTheGioi;',
+          'varying vec3 vPhapTuyenTG;',
+          tuyChon.dinhKhaiBao || ''
+        ].join('\n'))
         .replace('#include <fog_vertex>', [
           '#include <fog_vertex>',
           'vec4 viTriTG = vec4(transformed, 1.0);',
+          'vec3 phapTuyenTG = objectNormal;',
           '#ifdef USE_INSTANCING',
-          '  viTriTG = instanceMatrix * viTriTG;   // vật vẽ bằng InstancedMesh',
+          '  viTriTG = instanceMatrix * viTriTG;          // vật vẽ bằng InstancedMesh',
+          '  phapTuyenTG = mat3(instanceMatrix) * phapTuyenTG;',
           '#endif',
-          'vViTriTheGioi = (modelMatrix * viTriTG).xyz;'
+          'vViTriTheGioi = (modelMatrix * viTriTG).xyz;',
+          'vPhapTuyenTG = mat3(modelMatrix) * phapTuyenTG;'
         ].join('\n'));
 
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>',
-          '#include <common>\nvarying vec3 vViTriTheGioi;\n' + HALONG.glsl.bauTroi)
+        .replace('#include <common>', [
+          '#include <common>',
+          'varying vec3 vViTriTheGioi;',
+          'varying vec3 vPhapTuyenTG;',
+          'uniform vec3 uMauNuocSau;',
+          HALONG.glsl.bauTroi,
+          tuyChon.manhKhaiBao || ''
+        ].join('\n'))
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + (tuyChon.manhSauMau || ''))
         .replace('#include <tonemapping_fragment>', [
+          tuyChon.manhTruocSuong || '',
+          '// Phần chìm dưới nước (chân đảo, đáy thuyền): nước hấp thụ ánh sáng',
+          '// → càng sâu càng tối và ngả màu nước, không bị "sáng như trên cạn"',
+          'float sauDuoiNuoc = clamp(-vViTriTheGioi.y / 2.5, 0.0, 1.0);',
+          'gl_FragColor.rgb = mix(gl_FragColor.rgb, uMauNuocSau * 0.5, sauDuoiNuoc * 0.9);',
           'vec3 huongNhinSM = vViTriTheGioi - cameraPosition;',
           'float xaSM = length(huongNhinSM);',
           'gl_FragColor.rgb = mix(gl_FragColor.rgb, mauSuong(huongNhinSM / xaSM), heSoSuong(xaSM));',
@@ -243,7 +280,59 @@
         ].join('\n'))
         .replace('#include <fog_fragment>', ''); // bỏ sương mù 1 màu mặc định
     };
+    var khoa = 'halong:' + (tuyChon.ten || 'suong-mu');
+    vatLieu.customProgramCacheKey = function () { return khoa; };
     return vatLieu;
+  };
+
+  // Trường hợp đơn giản nhất: chỉ gắn sương mù theo hướng
+  HALONG.apDungSuongMu = function (vatLieu) {
+    return HALONG.vaShader(vatLieu, { ten: 'suong-mu' });
+  };
+
+  /* -----------------------------------------------------------------------
+   * 7. GHÉP HÌNH (merge geometry) – giảm số draw call
+   *    Mỗi vật thể riêng = 1 lệnh vẽ. Thuyền có hàng trăm chi tiết (cột,
+   *    lan can, nẹp buồm...) → gộp TẤT CẢ chi tiết cùng vật liệu thành 1 hình
+   *    duy nhất = 1 lệnh vẽ. Màu riêng từng chi tiết giữ bằng vertex color.
+   * --------------------------------------------------------------------- */
+  HALONG.hinh = {
+    // Tô 1 màu cho mọi đỉnh của hình
+    toMau: function (hinh, mau) {
+      var c = new THREE.Color(mau);
+      var n = hinh.attributes.position.count;
+      var mang = new Float32Array(n * 3);
+      for (var i = 0; i < n; i++) { mang[i * 3] = c.r; mang[i * 3 + 1] = c.g; mang[i * 3 + 2] = c.b; }
+      hinh.setAttribute('color', new THREE.BufferAttribute(mang, 3));
+      return hinh;
+    },
+    // Dời hình tới (x, y, z) sau khi xoay (radian) – "nướng" luôn vào tọa độ đỉnh
+    dat: function (hinh, x, y, z, xoayX, xoayY, xoayZ) {
+      if (xoayX) hinh.rotateX(xoayX);
+      if (xoayZ) hinh.rotateZ(xoayZ);
+      if (xoayY) hinh.rotateY(xoayY);
+      hinh.translate(x, y, z);
+      return hinh;
+    },
+    // Ống tròn nối 2 điểm a → b (dùng cho cột, thanh lan can, nẹp buồm)
+    ongNoi: function (a, b, banKinh, soCanh) {
+      var huong = new THREE.Vector3().subVectors(b, a);
+      var hinh = new THREE.CylinderGeometry(banKinh, banKinh, huong.length(), soCanh || 6, 1, true);
+      hinh.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0), huong.clone().normalize()));
+      hinh.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      return hinh;
+    },
+    // Gộp danh sách hình thành 1. boUv = true: bỏ toạ độ texture (khi vật liệu không dùng ảnh)
+    gop: function (ds, boUv) {
+      // mergeGeometries đòi mọi hình có CÙNG bộ thuộc tính (position, normal, uv, color...)
+      ds.forEach(function (h) {
+        if (boUv && h.attributes.uv) h.deleteAttribute('uv');
+      });
+      var ketQua = THREE.BufferGeometryUtils.mergeGeometries(ds, false);
+      ds.forEach(function (h) { h.dispose(); });
+      return ketQua;
+    }
   };
 
   // Lấy vị trí camera trong thế giới (dùng ở nhiều component)
