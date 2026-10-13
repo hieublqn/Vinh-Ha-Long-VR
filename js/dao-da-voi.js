@@ -62,7 +62,7 @@
     xa: { soGoc: 22, soTangTren: 14, buocDuoi: 0.1 },
     noiBat: { soGoc: 72, soTangTren: 56, buocDuoi: 0.025 }
   };
-  var NGUONG_LOD = 150;        // cách mép đảo hơn 150 m → dùng bản ít chi tiết
+  // Cách mép đảo hơn HALONG.chatLuong.cauHinh.nguongLOD (150 m, Thấp: 80 m) → dùng bản ít chi tiết
 
   // Bán kính thân đảo tại độ cao y (chưa có noise)
   function banKinhTheoDoCao(y, kieu, hat) {
@@ -470,6 +470,7 @@
     // xuống GPU khi có đảo đổi nhóm.
     chiaMucChiTiet: function () {
       var cam = HALONG.viTriCamera(this.el.sceneEl, this.viTriCam);
+      var NGUONG_LOD = HALONG.chatLuong.cauHinh.nguongLOD;
       this.cacNhom.forEach(function (nh) {
         var doi = false;
         nh.dao.forEach(function (dao) {

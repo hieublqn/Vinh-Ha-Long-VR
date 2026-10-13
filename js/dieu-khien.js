@@ -24,13 +24,25 @@
  *       Không đi xuyên đảo     : va chạm đơn giản bằng khoảng cách tới tâm đảo
  *       Giới hạn vùng chơi     : không đi ra ngoài vòng tròn bán kính cho trước
  *   Cả 2 chế độ: giữ chuột trái + kéo để xoay góc nhìn (look-controls của A-Frame).
- * Mốc 5 sẽ thêm: tay cầm VR, teleport, snap turn, nút ảo trên điện thoại.
+ *
+ * ĐẦU VÀO KHÁC (cộng chung với bàn phím, đều theo quy ước cần gạt: y < 0 = đi tới):
+ *   HALONG.dieuKhienAo : cần ảo + nút bay trên màn cảm ứng (giao-dien.js)
+ *   HALONG.dieuKhienVR : cần trái + nút grip của tay cầm VR (component tay-cam-vr bên dưới)
+ *
+ * COMPONENT "tay-cam-vr" (gắn vào 2 entity tay trong rig, cùng laser-controls):
+ *   Cần trái     : đi lại (theo hướng đầu đang nhìn)
+ *   Cần phải     : gạt ngang → xoay nhanh 30° (snap turn: xoay từng nấc, không xoay trơn →
+ *                  đỡ say VR); gạt lên → hiện vòng cung ngắm, thả ra → dịch chuyển tức thời
+ *   Grip trái / phải : hạ xuống / bay lên (chế độ Tự do)
+ *   Cò (trigger)  : bấm biểu tượng "i", nút trên bảng thuyết minh (tia laser của laser-controls)
+ *   X: đổi chế độ · Y: đổi thời điểm · A: đóng bảng / hành động (Vào hang...) · B: tắt / bật tiếng
  * ========================================================================= */
 (function () {
   'use strict';
 
   var HALONG = window.HALONG;
   var TRUC_Y = new THREE.Vector3(0, 1, 0);
+  var KHONG_DIEU_KHIEN = { x: 0, y: 0, len: 0 };
 
   AFRAME.registerComponent('dieu-khien', {
     // A-Frame gọi tick() theo TỪNG LOẠI component, theo thứ tự đăng ký (không theo
@@ -60,6 +72,9 @@
       this.euler = new THREE.Euler();
       this.viTriBoong = new THREE.Vector2();   // (x, z) tâm rig trên boong (hệ tọa độ thuyền)
       this.viTriDau = new THREE.Vector2();     // (x, z) của ĐẦU trên boong (dùng khi kẹp)
+      this.gocQuayThem = 0;                    // góc đã xoay nhanh (snap turn) khi đứng trên thuyền
+      this.tam2 = new THREE.Vector3();
+      this.tamBoong = new THREE.Vector2();
       this.datLaiTrenBoong();
 
       this.khiNhanPhim = this.khiNhanPhim.bind(this);
@@ -105,8 +120,8 @@
       if (cu.cheDo === undefined || cu.cheDo === this.data.cheDo) return;
       this.vanToc.set(0, 0, 0);
       this.trongHang = false;
-      // Lên lại thuyền: đứng ở chỗ quen thuộc gần mũi
-      if (this.data.cheDo === 'du-thuyen') this.datLaiTrenBoong();
+      // Lên lại thuyền: đứng ở chỗ quen thuộc gần mũi, quay mặt về mũi thuyền
+      if (this.data.cheDo === 'du-thuyen') { this.datLaiTrenBoong(); this.gocQuayThem = 0; }
       this.el.sceneEl.emit('doi-che-do', { cheDo: this.data.cheDo });
     },
 
@@ -136,10 +151,13 @@
       this.phai.crossVectors(this.truoc, TRUC_Y);     // tích có hướng → vector bên phải
 
       // 2) Đọc phím
+      //    Cộng bàn phím + cần ảo (điện thoại) + tay cầm VR, rồi kẹp trong [-1, 1]
       var trenThuyen = this.data.cheDo === 'du-thuyen' && HALONG.thuyen;
-      var tien = this.giu('KeyW', 'ArrowUp') - this.giu('KeyS', 'ArrowDown');
-      var ngang = this.giu('KeyD', 'ArrowRight') - this.giu('KeyA', 'ArrowLeft');
-      var len = trenThuyen ? 0 : this.giu('Space') - this.giu('KeyC');
+      var ao = HALONG.dieuKhienAo || KHONG_DIEU_KHIEN, vr = HALONG.dieuKhienVR || KHONG_DIEU_KHIEN;
+      var kep1 = THREE.MathUtils.clamp;
+      var tien = kep1(this.giu('KeyW', 'ArrowUp') - this.giu('KeyS', 'ArrowDown') - ao.y - vr.y, -1, 1);
+      var ngang = kep1(this.giu('KeyD', 'ArrowRight') - this.giu('KeyA', 'ArrowLeft') + ao.x + vr.x, -1, 1);
+      var len = trenThuyen ? 0 : kep1(this.giu('Space') - this.giu('KeyC') + ao.len + vr.len, -1, 1);
       var nhanh = this.giu('ShiftLeft', 'ShiftRight') ? this.data.heSoNhanh : 1;
 
       this.mucTieu.set(0, 0, 0)
@@ -194,9 +212,94 @@
         tt.doCaoSanThe(this.viTriDau.x, this.viTriDau.y),
         tt.viTri.z - bx * s + bz * c
       );
-      // Rig chỉ xoay theo HƯỚNG thuyền, không chúi/lắc theo (đỡ say sóng khi đeo kính);
-      // phần nhấp nhô lên xuống vẫn có vì sàn boong nâng hạ theo sóng.
-      o.rotation.set(0, goc, 0);
+      // Rig chỉ xoay theo HƯỚNG thuyền (+ góc người dùng đã xoay nhanh bằng tay cầm), không
+      // chúi/lắc theo (đỡ say sóng khi đeo kính); nhấp nhô vẫn có vì sàn boong nâng hạ theo sóng.
+      o.rotation.set(0, goc + this.gocQuayThem, 0);
+    },
+
+    /* ---------- Xoay nhanh (snap turn) quanh ĐẦU người dùng ----------
+     * Xoay rig quanh tâm rig thì đầu (lệch khỏi tâm khi đeo kính, bước đi trong phòng thật)
+     * sẽ văng theo một cung → xoay xong dời rig bù lại cho đầu đứng yên. */
+    quayNhanh: function (goc) {
+      var o = this.el.object3D, cam = this.el.sceneEl.camera, truoc = this.tam2;
+      if (!cam) return;
+      cam.getWorldPosition(truoc);
+      var trenThuyen = this.data.cheDo === 'du-thuyen' && HALONG.thuyen;
+      if (trenThuyen) { this.gocQuayThem += goc; o.rotation.y = HALONG.thuyen.goc + this.gocQuayThem; }
+      else o.rotation.y += goc;
+      o.updateMatrixWorld(true);
+      cam.getWorldPosition(this.dau);
+      var dx = truoc.x - this.dau.x, dz = truoc.z - this.dau.z;
+      if (trenThuyen) {
+        // độ dời (thế giới) → hệ toạ độ thuyền (xoay ngược 'goc' quanh trục Y)
+        var c = Math.cos(HALONG.thuyen.goc), s = Math.sin(HALONG.thuyen.goc);
+        this.viTriBoong.x += dx * c - dz * s;
+        this.viTriBoong.y += dx * s + dz * c;
+      } else {
+        o.position.x += dx; o.position.z += dz;
+      }
+    },
+
+    /* ---------- Dịch chuyển tức thời (teleport) ----------
+     * kiemTraDiem(p): p (thế giới) có tới được không. Trả về:
+     *   'boong'  – trên boong (đang ở chế độ Du thuyền)
+     *   'hang'   – trên sàn hang (đang ở trong hang)
+     *   'nuoc'   – mặt nước ngoài trời, không nằm trong đảo / nhà bè, trong vùng chơi
+     *   null     – không hợp lệ */
+    kiemTraDiem: function (p, loaiMat) {
+      var tt = HALONG.thuyen, hang = HALONG.hangDong;
+      if (loaiMat === 'boong') {
+        if (this.data.cheDo !== 'du-thuyen' || !tt) return null;
+        var c = Math.cos(tt.goc), s = Math.sin(tt.goc), dx = p.x - tt.viTri.x, dz = p.z - tt.viTri.z;
+        var cb = this.tamBoong.set(dx * c - dz * s, dx * s + dz * c), x0 = cb.x, z0 = cb.y;
+        tt.kepTrenBoong(cb);
+        return Math.hypot(cb.x - x0, cb.y - z0) < 0.05 ? 'boong' : null;
+      }
+      if (loaiMat === 'hang') {
+        return hang && hang.trong(this.tam2.set(p.x, p.y + 1.6, p.z)) ? 'hang' : null;
+      }
+      // Mặt nước: ngoài mọi elip va chạm (đảo, nhà bè) và trong vùng chơi
+      var vatCan = HALONG.vatCan;
+      for (var i = 0; i < vatCan.length; i++) {
+        var o = vatCan[i], k = o.le != null ? o.le : this.data.khoangCachDao;
+        var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0), ox = p.x - o.x, oz = p.z - o.z;
+        if (Math.hypot((ox * cs - oz * sn) / ((o.rX || o.r) + k), (ox * sn + oz * cs) / ((o.rZ || o.r) + k)) < 1) return null;
+      }
+      return Math.hypot(p.x, p.z) < this.data.banKinhGioiHan ? 'nuoc' : null;
+    },
+
+    // Điểm p có nằm TRONG thân 1 đảo / nhà bè không (elip đáy, cao tới đỉnh, không cộng lề).
+    // Vòng cung ngắm gọi hàm này để dừng lại khi đâm vào vách đá, tránh "nhảy xuyên đảo".
+    trongVatCan: function (p) {
+      var vatCan = HALONG.vatCan;
+      for (var i = 0; i < vatCan.length; i++) {
+        var o = vatCan[i];
+        if (p.y > o.cao) continue;
+        var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0), ox = p.x - o.x, oz = p.z - o.z;
+        if (Math.hypot((ox * cs - oz * sn) / (o.rX || o.r), (ox * sn + oz * cs) / (o.rZ || o.r)) < 1) return true;
+      }
+      return false;
+    },
+
+    // Đưa người dùng tới điểm p (chân đứng tại p). loai: kết quả kiemTraDiem
+    dichChuyenToi: function (p, loai) {
+      var o = this.el.object3D, cam = this.el.sceneEl.camera;
+      if (!cam) return;
+      cam.getWorldPosition(this.dau);
+      if (loai === 'boong') {
+        // Đổi điểm đích về hệ thuyền; dời vị trí trên boong sao cho ĐẦU tới đúng chỗ đó
+        var tt = HALONG.thuyen, c = Math.cos(tt.goc), s = Math.sin(tt.goc);
+        var dx = p.x - this.dau.x, dz = p.z - this.dau.z;
+        this.viTriBoong.x += dx * c - dz * s;
+        this.viTriBoong.y += dx * s + dz * c;
+        return;                                  // diTrenBoong khung sau kẹp lại trong vùng boong
+      }
+      o.position.x += p.x - this.dau.x;
+      o.position.z += p.z - this.dau.z;
+      o.position.y = p.y;                        // chân rig đặt lên mặt nước / sàn hang
+      this.vanToc.set(0, 0, 0);
+      if (loai === 'hang') this.trongHang = true;
+      this.gioiHan();
     },
 
     // Trong hang: đầu cao hơn sàn hang ≥ 1,5 m (ngoài phễu trên mặt nước thì hạ dần về 1,6 m)
@@ -279,6 +382,217 @@
         var thu = (r - d.banKinhGioiHan) / r;
         p.x -= this.dau.x * thu; p.z -= this.dau.z * thu;
       }
+    }
+  });
+
+  /* =========================================================================
+   * COMPONENT "tay-cam-vr": nút + cần gạt của tay cầm VR (đọc sự kiện do laser-controls
+   * tạo ra: oculus-touch-controls, valve-index-controls... đều phát cùng tên sự kiện)
+   * ========================================================================= */
+  var VUNG_CHET = 0.18;          // cần gạt lệch nhỏ hơn thế này coi như 0 (cần cũ hay "trôi")
+  var GOC_QUAY = Math.PI / 6;    // xoay nhanh mỗi nấc 30°
+  var SO_DIEM_CUNG = 48;         // số điểm của vòng cung ngắm dịch chuyển
+
+  AFRAME.registerComponent('tay-cam-vr', {
+    schema: { tay: { default: 'phai', oneOf: ['trai', 'phai'] } },
+
+    init: function () {
+      var self = this, el = this.el;
+      HALONG.dieuKhienVR = HALONG.dieuKhienVR || { x: 0, y: 0, len: 0 };
+      this.daQuay = false;       // cần phải đang gạt ngang (chờ thả về giữa mới cho xoay nấc tiếp)
+      this.dangNgam = false;     // cần phải đang gạt lên: đang ngắm điểm dịch chuyển
+      this.diemDich = new THREE.Vector3();
+      this.loaiDich = null;
+      this.p0 = new THREE.Vector3(); this.v0 = new THREE.Vector3(); this.p = new THREE.Vector3();
+      this.q = new THREE.Quaternion();
+
+      // Mô hình tay cầm đơn giản tự dựng (laser-controls đặt model: false → không tải mô hình
+      // 3D từ mạng, chạy offline được). Chỉ hiện khi tay cầm thật đã kết nối.
+      var nhom = new THREE.Group();
+      var vlThan = new THREE.MeshLambertMaterial({ color: '#2b2433' });
+      var than = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.13, 12), vlThan);
+      than.rotation.x = -Math.PI / 2 + 0.5; than.position.set(0, -0.02, 0.04);
+      var vong = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 8, 24), new THREE.MeshBasicMaterial({ color: '#ffb26b' }));
+      vong.rotation.x = 0.5; vong.position.set(0, 0.01, -0.02);
+      nhom.add(than, vong);
+      nhom.visible = false;
+      el.setObject3D('mo-hinh', nhom);
+      this.khiKetNoi = function () { nhom.visible = true; };
+      this.khiNgat = function () { nhom.visible = false; self.datLai(); };
+      el.addEventListener('controllerconnected', this.khiKetNoi);
+      el.addEventListener('controllerdisconnected', this.khiNgat);
+
+      this.khiCan = this.khiCanGat.bind(this);
+      el.addEventListener('thumbstickmoved', this.khiCan);
+      // Grip: tay trái hạ xuống, tay phải bay lên (chế độ Tự do)
+      var huong = this.data.tay === 'trai' ? -1 : 1;
+      this.khiGripXuong = function () { HALONG.dieuKhienVR.len = huong; };
+      this.khiGripLen = function () { if (HALONG.dieuKhienVR.len === huong) HALONG.dieuKhienVR.len = 0; };
+      el.addEventListener('gripdown', this.khiGripXuong);
+      el.addEventListener('gripup', this.khiGripLen);
+      // Nút mặt trên
+      this.cacNut = {
+        xbuttondown: this.doiCheDo.bind(this),
+        ybuttondown: function () {
+          if (!HALONG.thoiDiemKeTiep) return;
+          HALONG.thoiDiemKeTiep();
+          var ten = { ngay: 'Ngày', hoangHon: 'Hoàng hôn', dem: 'Đêm' }[HALONG.thoiDiem] || '';
+          HALONG.thongBao('Thời điểm: ' + ten);
+        },
+        abuttondown: this.hanhDong.bind(this),
+        bbuttondown: function () {
+          if (!HALONG.amThanh) return;
+          HALONG.thongBao(HALONG.amThanh.doiTatTieng() ? 'Đã tắt tiếng' : 'Đã bật tiếng');
+        }
+      };
+      Object.keys(this.cacNut).forEach(function (ten) { el.addEventListener(ten, self.cacNut[ten]); });
+
+      // Vòng cung ngắm + vòng tròn đánh dấu điểm đến (chỉ tay phải), đặt thẳng trong cảnh
+      if (this.data.tay === 'phai') {
+        var hinhCung = new THREE.BufferGeometry();
+        hinhCung.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SO_DIEM_CUNG * 3), 3));
+        this.vlCung = new THREE.LineBasicMaterial({ color: '#6ee7d8', transparent: true, opacity: 0.9, fog: false });
+        this.cung = new THREE.Line(hinhCung, this.vlCung);
+        this.cung.frustumCulled = false;
+        this.cung.visible = false;
+        this.dich = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 32).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: '#6ee7d8', transparent: true, opacity: 0.85, side: THREE.DoubleSide, fog: false }));
+        this.dich.visible = false;
+        el.sceneEl.object3D.add(this.cung, this.dich);
+      }
+    },
+
+    remove: function () {
+      var el = this.el, self = this;
+      el.removeEventListener('controllerconnected', this.khiKetNoi);
+      el.removeEventListener('controllerdisconnected', this.khiNgat);
+      el.removeEventListener('thumbstickmoved', this.khiCan);
+      el.removeEventListener('gripdown', this.khiGripXuong);
+      el.removeEventListener('gripup', this.khiGripLen);
+      Object.keys(this.cacNut).forEach(function (ten) { el.removeEventListener(ten, self.cacNut[ten]); });
+      if (this.cung) { this.cung.parent.remove(this.cung); this.dich.parent.remove(this.dich); }
+      el.removeObject3D('mo-hinh');
+    },
+
+    dieuKhien: function () {
+      var rig = document.querySelector('[dieu-khien]');
+      return rig && rig.components['dieu-khien'];
+    },
+
+    datLai: function () {
+      if (this.data.tay === 'trai') { HALONG.dieuKhienVR.x = 0; HALONG.dieuKhienVR.y = 0; }
+      HALONG.dieuKhienVR.len = 0;
+      this.dangNgam = false;
+      if (this.cung) { this.cung.visible = false; this.dich.visible = false; }
+    },
+
+    khiCanGat: function (e) {
+      var x = e.detail.x, y = e.detail.y;
+      if (Math.abs(x) < VUNG_CHET) x = 0;
+      if (Math.abs(y) < VUNG_CHET) y = 0;
+      if (this.data.tay === 'trai') {            // cần trái: đi lại
+        HALONG.dieuKhienVR.x = x;
+        HALONG.dieuKhienVR.y = y;
+        return;
+      }
+      // Cần phải. Xoay nhanh: gạt ngang quá 0,7 → xoay 1 nấc; phải thả về gần giữa mới xoay tiếp
+      if (!this.dangNgam) {
+        if (!this.daQuay && Math.abs(x) > 0.7 && Math.abs(x) > Math.abs(y)) {
+          this.daQuay = true;
+          var dk = this.dieuKhien();
+          if (dk) dk.quayNhanh(x > 0 ? -GOC_QUAY : GOC_QUAY);   // gạt phải = quay phải (góc âm quanh Y)
+        } else if (Math.abs(x) < 0.3) {
+          this.daQuay = false;
+        }
+      }
+      // Dịch chuyển: gạt lên (y < -0.7) → ngắm; thả về (y > -0.3) → đi tới điểm đang ngắm
+      if (!this.dangNgam && y < -0.7 && Math.abs(y) > Math.abs(x)) {
+        this.dangNgam = true;
+      } else if (this.dangNgam && y > -0.3) {
+        this.dangNgam = false;
+        this.cung.visible = false;
+        this.dich.visible = false;
+        this.thucHienDichChuyen();
+      }
+    },
+
+    thucHienDichChuyen: function () {
+      var dk = this.dieuKhien(), loai = this.loaiDich, diem = this.diemDich.clone();
+      if (!dk || !loai) return;
+      // "Chớp mắt" rất nhanh (0,1 s tối, 0,18 s sáng) → không thấy cảnh trượt, đỡ chóng mặt
+      var lam = function () { dk.dichChuyenToi(diem, loai); };
+      if (!HALONG.chuyenCanh || !HALONG.chuyenCanh(lam, 0.1, 0.18)) lam();
+    },
+
+    doiCheDo: function () {
+      var dk = this.dieuKhien();
+      if (!dk) return;
+      dk.doiCheDo();
+      HALONG.thongBao(dk.data.cheDo === 'tu-do' ? 'Chế độ: Tự do (bay khám phá)' : 'Chế độ: Du thuyền');
+    },
+
+    // Nút A: đang mở bảng thuyết minh → đóng; không thì làm hành động trên chip (Vào hang...)
+    hanhDong: function () {
+      var tt = document.querySelector('#diem-thong-tin');
+      var c = tt && tt.components['diem-thong-tin'];
+      if (c && c.bangDangMo) { c.dongBang(); return; }
+      var gd = this.el.sceneEl.components['giao-dien'];
+      if (gd && gd.hanhDongChip) gd.hanhDongChip();
+    },
+
+    // Vòng cung ngắm: ném "viên bi" ảo theo hướng tia của tay cầm (v₀ = 9 m/s, rơi tự do)
+    // rồi tìm chỗ nó chạm boong / sàn hang / mặt nước
+    tick: function () {
+      if (!this.dangNgam || !this.cung) return;
+      var dk = this.dieuKhien(), el = this.el, rc = el.components.raycaster;
+      if (!dk) return;
+      var o = el.object3D;
+      o.updateMatrixWorld();
+      var goc = rc ? rc.data.origin : null, huong = rc ? rc.data.direction : null;
+      this.p0.set(goc ? goc.x : 0, goc ? goc.y : 0, goc ? goc.z : 0).applyMatrix4(o.matrixWorld);
+      o.getWorldQuaternion(this.q);
+      this.v0.set(huong ? huong.x : 0, huong ? huong.y : 0, huong ? huong.z : -1).normalize().applyQuaternion(this.q).multiplyScalar(9);
+
+      var tt = HALONG.thuyen, hang = HALONG.hangDong;
+      var trenThuyen = dk.data.cheDo === 'du-thuyen' && tt;
+      var dauTrongHang = !trenThuyen && hang && dk.trongHang;
+      var mang = this.cung.geometry.attributes.position.array, p = this.p, n = 0, loai = null;
+      for (var i = 0; i < SO_DIEM_CUNG; i++) {
+        var t = i * 0.045;
+        p.copy(this.p0).addScaledVector(this.v0, t);
+        p.y -= 4.9 * t * t;
+        mang[n++] = p.x; mang[n++] = p.y; mang[n++] = p.z;
+        if (i === 0) continue;
+        // Mặt có thể đứng: boong (hệ thuyền), sàn hang, hoặc mặt nước (y = 0)
+        var matY, loaiMat;
+        if (trenThuyen) {
+          var c = Math.cos(tt.goc), s = Math.sin(tt.goc), dx = p.x - tt.viTri.x, dz = p.z - tt.viTri.z;
+          matY = tt.doCaoSanThe(dx * c - dz * s, dx * s + dz * c);
+          loaiMat = 'boong';
+          if (p.y <= 0) { loai = null; break; }                    // rơi qua mạn xuống nước: không hợp lệ
+        } else if (dauTrongHang) {
+          matY = hang.sanY; loaiMat = 'hang';
+        } else {
+          matY = 0; loaiMat = 'nuoc';
+          if (dk.trongVatCan(p)) { loai = null; break; }           // đâm vào vách đảo: dừng cung, báo đỏ
+        }
+        if (p.y <= matY) {
+          p.y = matY;
+          mang[n - 2] = matY;
+          loai = dk.kiemTraDiem(p, loaiMat);
+          break;
+        }
+      }
+      var soDiem = n / 3;
+      this.cung.geometry.setDrawRange(0, soDiem);
+      this.cung.geometry.attributes.position.needsUpdate = true;
+      this.loaiDich = loai;
+      this.diemDich.copy(p);
+      var mau = loai ? '#6ee7d8' : '#ff6b6b';                       // xanh: tới được · đỏ: không
+      this.vlCung.color.set(mau);
+      this.cung.visible = true;
+      this.dich.visible = !!loai;
+      if (loai) { this.dich.position.copy(p); this.dich.position.y += 0.03; this.dich.material.color.set(mau); }
     }
   });
 })();

@@ -101,6 +101,8 @@
     loading-screen="enabled: false": dùng màn hình chờ riêng ở trên (có nút Bắt đầu).
     cursor + raycaster: bấm chuột / chạm vào biểu tượng "i" (class diem-tt) để mở bảng
       thuyết minh. Raycaster CHỈ xét các vật có class diem-tt và 12,5 lần/giây → rất nhẹ.
+    device-orientation-permission-ui="enabled: false": tắt hộp thoại xin quyền con quay của
+      A-Frame trên iPhone; nút "Bắt đầu" đã xin quyền này (giao-dien.js) → không hỏi 2 lần.
   -->
   <a-scene
     renderer="antialias: true; alpha: false; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.1"
@@ -110,6 +112,7 @@
     loading-screen="enabled: false"
     cursor="rayOrigin: mouse; fuse: false"
     raycaster="objects: .diem-tt; far: 400; interval: 80"
+    device-orientation-permission-ui="enabled: false"
     giao-dien>
 
     <!-- Bầu trời + mặt trời/mặt trăng + ánh sáng. Bắt đầu lúc hoàng hôn;
@@ -150,6 +153,16 @@
       <a-entity id="camera" position="0 1.6 0"
                 camera="near: 0.1; far: 4000"
                 look-controls="pointerLockEnabled: false; magicWindowTrackingEnabled: true"></a-entity>
+      <!-- 2 tay cầm VR (chỉ hoạt động khi đeo kính có tay cầm):
+           laser-controls: tia laser + cò để bấm biểu tượng "i" / nút trên bảng thuyết minh.
+           model: false → không tải mô hình tay cầm từ mạng (tay-cam-vr tự dựng hình đơn giản).
+           tay-cam-vr: cần gạt, nút (đi lại, xoay nhanh 30°, dịch chuyển, đổi chế độ...) -->
+      <a-entity id="tay-trai" laser-controls="hand: left; model: false"
+                raycaster="objects: .diem-tt; far: 400; interval: 80; lineColor: #ffb26b; lineOpacity: 0.6"
+                tay-cam-vr="tay: trai"></a-entity>
+      <a-entity id="tay-phai" laser-controls="hand: right; model: false"
+                raycaster="objects: .diem-tt; far: 400; interval: 80; lineColor: #ffb26b; lineOpacity: 0.6"
+                tay-cam-vr="tay: phai"></a-entity>
     </a-entity>
   </a-scene>
 </body>

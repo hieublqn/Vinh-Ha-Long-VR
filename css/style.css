@@ -215,6 +215,7 @@ body.dang-thuyet-minh #bang-diem-dung { opacity: 0; }
   border-radius: 0 999px 999px 0;
 }
 #nut-thoi-diem .nut-loa.dang-tat { opacity: 0.7; }
+#nut-thoi-diem .nut-chat-luong { padding: 6px 10px; }
 
 /* Bản đồ nhỏ – góc phải, dưới nút thời điểm */
 #ban-do {
@@ -370,6 +371,66 @@ body.nhay-chup::after { opacity: 0.55; transition: none; }
 @media (pointer: coarse) {
   #chip-che-do .goi-y { display: none; }
 }
+
+/* ---------- Màn cảm ứng (Mốc 5): cần điều khiển ảo + nút ---------- */
+#dieu-khien-cam-ung { display: none; }
+body.cam-ung #dieu-khien-cam-ung { display: block; }
+#can-ao {
+  position: fixed;
+  z-index: 11;
+  left: 20px;
+  bottom: 20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(20, 16, 40, 0.45);
+  border: 2px solid var(--vien-khung);
+  touch-action: none;                     /* kéo trên cần không cuộn / phóng to trang */
+}
+#num-can-ao {
+  position: absolute;
+  left: 34px;
+  top: 34px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 178, 107, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+#nut-cam-ung {
+  position: fixed;
+  z-index: 11;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+#nut-cam-ung button {
+  min-width: 56px;
+  height: 52px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--chu);
+  background: rgba(20, 16, 40, 0.6);
+  border: 1px solid var(--vien-khung);
+  border-radius: 26px;
+  touch-action: none;
+}
+#nut-cam-ung #nut-bay-len, #nut-cam-ung #nut-bay-xuong { display: none; font-size: 20px; }
+body.che-do-tu-do #nut-cam-ung #nut-bay-len,
+body.che-do-tu-do #nut-cam-ung #nut-bay-xuong { display: block; }
+/* Màn cảm ứng: chip + bảng điểm dừng lên phía trên (phía dưới dành cho cần ảo và nút),
+   ẩn bảng thông số và nút kính VR của A-Frame không che nút */
+body.cam-ung #chip-che-do { top: 60px; bottom: auto; font-size: 12px; }
+body.cam-ung #bang-diem-dung { top: 100px; bottom: auto; }
+body.cam-ung #bang-thong-so { display: none; }
+body.cam-ung #thong-bao { bottom: 160px; }
+body.cam-ung .a-enter-vr { bottom: 160px !important; }
 
 /* Màn thấp (điện thoại xoay ngang): bản đồ nhỏ lại để không đè bảng điểm dừng */
 @media (max-height: 520px) {

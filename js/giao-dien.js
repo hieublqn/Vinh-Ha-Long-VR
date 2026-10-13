@@ -14,6 +14,12 @@
  *   6. Chuyển cảnh tối dần – sáng dần khi dịch chuyển vào / ra hang: quả cầu đen gắn
  *      vào camera (vật 3D nên thấy được cả khi đeo kính VR, khác khung HTML).
  *   7. Bảng thông số hiệu năng: FPS, số draw call, số tam giác.
+ *   8. Chất lượng đồ hoạ Thấp / Cao (nút ⚙, phím Q): lúc đầu đo FPS, máy chạy chậm thì
+ *      tự hạ xuống Thấp (nếu người dùng chưa tự chọn).
+ *   9. Thông báo: khung HTML trên màn hình + khung 3D gắn trước mắt khi đeo kính VR
+ *      (đổi chế độ, đổi thời điểm bằng nút tay cầm... cần có phản hồi nhìn thấy được).
+ *  10. Màn cảm ứng (điện thoại, máy tính bảng): cần điều khiển ảo để đi lại, nút bay
+ *      lên / xuống, nút đổi chế độ; vuốt màn hình để xoay; nghiêng máy để nhìn (con quay).
  * ========================================================================= */
 (function () {
   'use strict';
@@ -108,6 +114,14 @@
         self.nutLoa.blur();
       });
       this.nutThoiDiem.appendChild(this.nutLoa);
+      this.nutChatLuong = document.createElement('button');
+      this.nutChatLuong.type = 'button';
+      this.nutChatLuong.className = 'nut-chat-luong';
+      this.nutChatLuong.addEventListener('click', function () {
+        self.doiChatLuong();
+        self.nutChatLuong.blur();
+      });
+      this.nutThoiDiem.appendChild(this.nutChatLuong);
       document.body.appendChild(this.nutThoiDiem);
       this.khiDoiThoiDiem = this.danhDauThoiDiem.bind(this);
       sceneEl.addEventListener('doi-thoi-diem', this.khiDoiThoiDiem);
@@ -150,6 +164,7 @@
           case 'KeyB': this.banDo.classList.toggle('an'); break;
           case 'KeyP': this.chupAnh(); break;
           case 'KeyT': if (HALONG.amThanh) HALONG.amThanh.doiTatTieng(); break;
+          case 'KeyQ': this.doiChatLuong(); break;
           default: {
             // Phím 1 2 3: Ngày / Hoàng hôn / Đêm
             var phimSo = { Digit1: 'ngay', Digit2: 'hoangHon', Digit3: 'dem' }[e.code];
@@ -174,8 +189,26 @@
 
       this.taoManHinhCho();
       this.taoQuaCauChuyenCanh();
+      this.taoThongBao3D();
+      this.taoDieuKhienCamUng();
       HALONG.vaoHang = this.vaoHang.bind(this);
       HALONG.raKhoiHang = this.raKhoiHang.bind(this);
+      HALONG.chuyenCanh = this.chuyenCanh.bind(this);
+      // Thông báo ngắn: khung HTML; đang đeo kính thì thêm khung 3D trước mắt (HTML không thấy trong kính)
+      HALONG.thongBao = function (chu) {
+        self.hienThongBao(chu);
+        if (sceneEl.is('vr-mode')) self.hienThongBao3D(chu);
+      };
+
+      // --- Chất lượng đồ hoạ ---
+      HALONG.chatLuong.datMuc(HALONG.chatLuong.ten);
+      this.khiDoiChatLuong = this.capNhatNutChatLuong.bind(this);
+      sceneEl.addEventListener('doi-chat-luong', this.khiDoiChatLuong);
+      this.capNhatNutChatLuong();
+      // Thoát kính: A-Frame đặt lại tỉ lệ điểm ảnh theo màn hình → áp lại mức đang chọn
+      this.khiThoatVR = function () { HALONG.chatLuong.datMuc(HALONG.chatLuong.ten); };
+      sceneEl.addEventListener('exit-vr', this.khiThoatVR);
+      this.doFps = { mau: [], xong: false };   // đo FPS vài giây đầu để tự hạ chất lượng
     },
 
     remove: function () {
@@ -187,6 +220,10 @@
       el.removeEventListener('renderstart', this.khiBatDauVe);
       el.removeEventListener('doi-thoi-diem', this.khiDoiThoiDiem);
       el.removeEventListener('doi-am-thanh', this.khiDoiAmThanh);
+      el.removeEventListener('doi-chat-luong', this.khiDoiChatLuong);
+      el.removeEventListener('exit-vr', this.khiThoatVR);
+      if (this.khungCamUng) this.khungCamUng.remove();
+      if (this.thongBao3D) this.thongBao3D.parent.remove(this.thongBao3D);
       el.removeEventListener('enter-vr', HALONG.batDau);
       clearTimeout(this.henGioCham);
       clearTimeout(this.henGioThongBao);
@@ -209,6 +246,12 @@
         HALONG.daBatDau = true;
         sceneEl.object3D.visible = true;                // hiện lại khung cảnh đã ẩn lúc chờ
         if (HALONG.amThanh) HALONG.amThanh.batDau();     // ngay trong thao tác bấm → được phép phát tiếng
+        // iPhone / iPad (iOS 13+): phải xin quyền con quay hồi chuyển trong 1 thao tác bấm
+        // thì "nghiêng máy để nhìn" mới chạy (look-controls dùng sự kiện deviceorientation)
+        var DOE = window.DeviceOrientationEvent;
+        if (DOE && typeof DOE.requestPermission === 'function') {
+          try { DOE.requestPermission().catch(function () {}); } catch (e) { /* trình duyệt từ chối */ }
+        }
         if (man) {
           if (nut) nut.blur();                           // không giữ focus trên nút đã ẩn
           man.classList.add('an-di');
@@ -276,6 +319,7 @@
 
     // Đổi chế độ: rời thuyền thì ẩn bảng điểm dừng; lên lại thuyền đúng lúc đang neo thì hiện lại
     khiDoiCheDoFn: function (e) {
+      this.capNhatNutCamUng();
       if (e.detail.cheDo === 'tu-do') this.bangDiemDung.classList.add('an');
       else if (this.diemDungCuoi) this.hienDiemDung({ detail: this.diemDungCuoi });
       this.capNhatChip();
@@ -372,7 +416,11 @@
       if (this.chipTen.textContent !== ten) this.chipTen.textContent = ten;
       if (this.chipChu.textContent !== chu) this.chipChu.textContent = chu;
       if (this.chipGoiY.textContent !== goiY) this.chipGoiY.textContent = goiY;
-      if (this.chipNut.textContent !== nhan) this.chipNut.textContent = nhan;
+      if (this.chipNut.textContent !== nhan) {
+        this.chipNut.textContent = nhan;
+        // Trong kính không thấy chip HTML → báo bằng thông báo 3D rằng nút A đang làm được gì
+        if (nhan && this.el.is('vr-mode')) HALONG.thongBao('Nút A trên tay cầm: ' + nhan.replace(' ▸', ''));
+      }
       this.chipNut.hidden = !nhan;
     },
 
@@ -393,11 +441,13 @@
       this.chuyen = null;
     },
 
-    // Tối dần (0,35 s) → làm việc 'hamGiua' lúc màn đen → sáng dần (0,5 s)
-    chuyenCanh: function (hamGiua) {
-      if (this.chuyen || !this.quaCauToi) return;
-      this.chuyen = { pha: 'toi', t: 0, hamGiua: hamGiua };
+    // Tối dần (mặc định 0,35 s) → làm việc 'hamGiua' lúc màn đen → sáng dần (0,5 s).
+    // Dịch chuyển tức thời (teleport) bằng tay cầm dùng bản nhanh (0,1 s / 0,18 s): chớp mắt.
+    chuyenCanh: function (hamGiua, tToi, tSang) {
+      if (this.chuyen || !this.quaCauToi) return false;
+      this.chuyen = { pha: 'toi', t: 0, hamGiua: hamGiua, tToi: tToi || 0.35, tSang: tSang || 0.5 };
       this.quaCauToi.visible = true;
+      return true;
     },
 
     capNhatChuyenCanh: function (giay) {
@@ -406,11 +456,11 @@
       c.t += giay;
       var vl = this.quaCauToi.material;
       if (c.pha === 'toi') {
-        vl.opacity = Math.min(c.t / 0.35, 1);
-        if (c.t >= 0.35) { c.hamGiua(); c.pha = 'sang'; c.t = 0; }
+        vl.opacity = Math.min(c.t / c.tToi, 1);
+        if (c.t >= c.tToi) { c.hamGiua(); c.pha = 'sang'; c.t = 0; }
       } else {
-        vl.opacity = 1 - Math.min(c.t / 0.5, 1);
-        if (c.t >= 0.5) { this.quaCauToi.visible = false; this.chuyen = null; }
+        vl.opacity = 1 - Math.min(c.t / c.tSang, 1);
+        if (c.t >= c.tSang) { this.quaCauToi.visible = false; this.chuyen = null; }
       }
     },
 
@@ -652,10 +702,160 @@
       this.henGioThongBao = setTimeout(function () { tb.classList.add('an'); }, 2600);
     },
 
+    /* ---------------- 8. Chất lượng đồ hoạ ---------------- */
+    doiChatLuong: function () {
+      var moi = HALONG.chatLuong.ten === 'cao' ? 'thap' : 'cao';
+      HALONG.chatLuong.datMuc(moi, true);
+      HALONG.thongBao(moi === 'cao' ? 'Đồ hoạ: Cao (đẹp nhất)' : 'Đồ hoạ: Thấp (mượt hơn trên máy yếu)');
+    },
+
+    capNhatNutChatLuong: function () {
+      var cao = HALONG.chatLuong.ten === 'cao';
+      this.nutChatLuong.textContent = cao ? '⚙ Cao' : '⚙ Thấp';
+      this.nutChatLuong.title = 'Chất lượng đồ hoạ: ' + (cao ? 'Cao' : 'Thấp') + ' (Q để đổi)';
+      this.nutChatLuong.setAttribute('aria-label', this.nutChatLuong.title);
+    },
+
+    // Vài giây đầu sau khi bấm Bắt đầu: FPS trung bình < 38 → tự hạ xuống Thấp (1 lần).
+    // Bỏ 2 giây đầu (đang nạp texture, biên dịch nốt); không đo khi đeo kính (kính tự giữ nhịp
+    // khung hình) hoặc khi người dùng đã tự chọn mức.
+    doFpsDauTien: function (fps) {
+      var d = this.doFps;
+      if (d.xong || !HALONG.daBatDau || this.el.is('vr-mode') || document.hidden) return;
+      if (HALONG.chatLuong.daChonTay || HALONG.chatLuong.ten !== 'cao') { d.xong = true; return; }
+      d.mau.push(fps);
+      if (d.mau.length < 16) return;                       // 16 lần × 0,5 s = 8 giây
+      d.xong = true;
+      var tb = d.mau.slice(4).reduce(function (a, b) { return a + b; }, 0) / (d.mau.length - 4);
+      if (tb < 38) {
+        HALONG.chatLuong.datMuc('thap');
+        HALONG.thongBao('Máy chạy chưa mượt (' + Math.round(tb) + ' FPS) → đã chuyển đồ hoạ sang Thấp. Bấm ⚙ hoặc Q để đổi lại.');
+      }
+    },
+
+    /* ---------------- 9. Thông báo 3D (trong kính VR) ---------------- */
+    taoThongBao3D: function () {
+      var c = this.canvasTB = document.createElement('canvas');
+      c.width = 1024; c.height = 160;
+      var tex = this.texTB = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      // Gắn vào camera: luôn ở trước mắt, hơi thấp; depthTest tắt → không bị vật gì che
+      var vl = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false });
+      this.thongBao3D = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.15), vl);
+      this.thongBao3D.position.set(0, -0.3, -1.3);
+      this.thongBao3D.renderOrder = 9500;
+      this.thongBao3D.visible = false;
+      this.thongBao3D.frustumCulled = false;
+      var camEl = this.el.querySelector('[camera]');
+      if (camEl) camEl.object3D.add(this.thongBao3D);
+      this.conLaiTB3D = 0;
+    },
+
+    hienThongBao3D: function (chu) {
+      var c = this.canvasTB, ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.fillStyle = 'rgba(22, 16, 42, 0.9)';
+      ctx.beginPath();
+      ctx.moveTo(80, 10); ctx.arcTo(1014, 10, 1014, 150, 70); ctx.arcTo(1014, 150, 10, 150, 70);
+      ctx.arcTo(10, 150, 10, 10, 70); ctx.arcTo(10, 10, 1014, 10, 70); ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(255, 178, 107, 0.8)';
+      ctx.stroke();
+      ctx.fillStyle = '#fdf3e7';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (var co = 46; co > 24; co -= 2) {          // thu nhỏ chữ cho vừa 1 dòng
+        ctx.font = '600 ' + co + 'px "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
+        if (ctx.measureText(chu).width < 940) break;
+      }
+      ctx.fillText(chu, 512, 82);
+      this.texTB.needsUpdate = true;
+      this.thongBao3D.visible = true;
+      this.conLaiTB3D = 2.2;                           // giây
+    },
+
+    /* ---------------- 10. Điều khiển cảm ứng ---------------- */
+    taoDieuKhienCamUng: function () {
+      var self = this;
+      // Giá trị điều khiển ảo dieu-khien.js đọc mỗi khung: x, y ∈ [-1, 1] như cần gạt tay cầm
+      // (y < 0 = đi tới), len: +1 bay lên / -1 hạ xuống
+      HALONG.dieuKhienAo = { x: 0, y: 0, len: 0 };
+      var camUng = AFRAME.utils.device.isMobile() ||
+        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      if (!camUng) return;
+      document.body.classList.add('cam-ung');
+      // Bảng hướng dẫn toàn phím tắt bàn phím, lại đè lên chip (chip lên trên trong bố cục cảm ứng)
+      this.bangHuongDan.classList.add('an');
+      var khung = this.khungCamUng = document.createElement('div');
+      khung.id = 'dieu-khien-cam-ung';
+      khung.innerHTML = [
+        '<div id="can-ao" aria-label="Cần điều khiển: kéo để đi lại"><div id="num-can-ao"></div></div>',
+        '<div id="nut-cam-ung">',
+        '<button type="button" id="nut-bay-len" aria-label="Bay lên">▲</button>',
+        '<button type="button" id="nut-bay-xuong" aria-label="Hạ xuống">▼</button>',
+        '<button type="button" id="nut-doi-che-do"></button>',
+        '</div>'
+      ].join('');
+      document.body.appendChild(khung);
+
+      // Cần ảo: dùng Pointer Events (chạy cho cả ngón tay lẫn chuột) + giữ con trỏ
+      // (setPointerCapture) → kéo ra ngoài vòng tròn vẫn điều khiển được
+      var can = khung.querySelector('#can-ao'), num = khung.querySelector('#num-can-ao');
+      var ao = HALONG.dieuKhienAo, idGiu = null, tam = { x: 0, y: 0 }, R = 44;
+      function capNhat(e) {
+        var dx = e.clientX - tam.x, dy = e.clientY - tam.y, l = Math.hypot(dx, dy);
+        if (l > R) { dx *= R / l; dy *= R / l; }
+        ao.x = dx / R; ao.y = dy / R;
+        num.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      }
+      can.addEventListener('pointerdown', function (e) {
+        var hop = can.getBoundingClientRect();
+        tam.x = hop.left + hop.width / 2; tam.y = hop.top + hop.height / 2;
+        idGiu = e.pointerId;
+        can.setPointerCapture(e.pointerId);
+        capNhat(e);
+        e.preventDefault();
+      });
+      can.addEventListener('pointermove', function (e) { if (e.pointerId === idGiu) capNhat(e); });
+      function tha(e) {
+        if (e.pointerId !== idGiu) return;
+        idGiu = null; ao.x = 0; ao.y = 0;
+        num.style.transform = '';
+      }
+      can.addEventListener('pointerup', tha);
+      can.addEventListener('pointercancel', tha);
+
+      // Nút bay lên / xuống: giữ để bay (chỉ hiện ở chế độ Tự do)
+      [['#nut-bay-len', 1], ['#nut-bay-xuong', -1]].forEach(function (cap) {
+        var nut = khung.querySelector(cap[0]);
+        nut.addEventListener('pointerdown', function (e) { ao.len = cap[1]; nut.setPointerCapture(e.pointerId); e.preventDefault(); });
+        ['pointerup', 'pointercancel'].forEach(function (ten) { nut.addEventListener(ten, function () { ao.len = 0; }); });
+      });
+      this.nutDoiCheDo = khung.querySelector('#nut-doi-che-do');
+      this.nutDoiCheDo.addEventListener('click', function () {
+        var rig = document.querySelector('[dieu-khien]');
+        if (rig && HALONG.daBatDau) rig.components['dieu-khien'].doiCheDo();
+      });
+      this.capNhatNutCamUng();
+    },
+
+    // Nhãn nút đổi chế độ + ẩn / hiện nút bay theo chế độ hiện tại
+    capNhatNutCamUng: function () {
+      if (!this.nutDoiCheDo) return;
+      var tuDo = this.cheDoHienTai() === 'tu-do';
+      this.nutDoiCheDo.textContent = tuDo ? '⛵ Lên thuyền' : '🕊 Bay tự do';
+      document.body.classList.toggle('che-do-tu-do', tuDo);
+    },
+
     /* ---------------- 6. Mỗi khung hình ---------------- */
     tick: function (t, dt) {
       if (!dt) return;
       this.capNhatChuyenCanh(Math.min(dt, 100) / 1000);
+      if (this.conLaiTB3D > 0) {
+        this.conLaiTB3D -= dt / 1000;
+        if (this.conLaiTB3D <= 0 || !this.el.is('vr-mode')) { this.conLaiTB3D = 0; this.thongBao3D.visible = false; }
+      }
       this.capNhatHuongNhin();
       // Bản đồ: 10 lần/giây là đủ mượt cho chấm di chuyển chậm
       this.demBanDo += dt;
@@ -675,6 +875,7 @@
         'FPS ' + tk.fps + '  ·  Draw call ' + tk.drawCall +
         '  ·  Tam giác ' + Math.round(tk.tamGiac / 1000) + 'k';
       this.bangThongSo.classList.toggle('cham', tk.fps < 45);   // đỏ khi dưới mục tiêu 45 FPS
+      this.doFpsDauTien(tk.fps);
       this.capNhatChip();
 
       this.soKhung = 0;

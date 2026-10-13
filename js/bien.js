@@ -409,8 +409,9 @@
       var tinh = HALONG.denLongTinh || [];
       for (i = 0; i < tinh.length; i++) if (tinh[i].distanceToSquared(cam) < 160 * 160) ds.push(tinh[i]);
       ds.sort(this.soSanhDen);
+      var soDen = Math.min(ds.length, HALONG.chatLuong.cauHinh.denPhanChieu);
       for (i = 0; i < den.length; i++) {
-        if (i < ds.length) den[i].set(ds[i].x, ds[i].y, ds[i].z, 1);
+        if (i < soDen) den[i].set(ds[i].x, ds[i].y, ds[i].z, 1);
         else den[i].set(0, 0, 0, 0);
       }
     },
@@ -441,9 +442,11 @@
       }
       mang.length = ds.length;
       mang.sort(function (a, b) { return b.diem - a.diem; });
-      // Xếp các đảo được chọn vào ĐẦU mảng; ô còn lại = 0 → shader gặp ô 0 là dừng (break)
+      // Xếp các đảo được chọn vào ĐẦU mảng; ô còn lại = 0 → shader gặp ô 0 là dừng (break).
+      // Chất lượng Thấp chỉ điền ít ô → vòng lặp dò tia mỗi điểm ảnh ngắn hơn.
+      var soO = Math.min(SO_DAO_PHAN_CHIEU, HALONG.chatLuong.cauHinh.daoPhanChieu);
       for (i = 0; i < SO_DAO_PHAN_CHIEU; i++) {
-        var o = mang[i];
+        var o = i < soO && mang[i];
         if (o && o.diem > 0) this.daoGan[i].set(o.dao.x, o.dao.z, HALONG.banKinhPhanChieu(o.dao), o.dao.cao * 0.92);
         else this.daoGan[i].set(0, 0, 0, 0);
       }

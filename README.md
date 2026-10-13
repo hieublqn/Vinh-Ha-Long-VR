@@ -4,7 +4,7 @@ Trải nghiệm thực tế ảo chạy trên trình duyệt (WebXR), làm bằn
 Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng code**: không dùng ảnh, mô hình 3D hay
 âm thanh tải từ ngoài nên chạy offline được 100%.
 
-> Đây là bản nháp README (đang ở Mốc 4). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
+> Đây là bản nháp README (đang ở Mốc 5). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
 
 ## Cách chạy
 
@@ -75,6 +75,8 @@ Bản đồ trong mô hình là **minh họa**: vị trí các điểm không đ
 | `B` | Ẩn / hiện bản đồ nhỏ |
 | `H` | Ẩn / hiện bảng hướng dẫn |
 
+| `Q` hoặc nút **⚙** | Đổi chất lượng đồ hoạ Cao / Thấp |
+
 Góc dưới bên trái là bảng **FPS · Draw call · Tam giác** để tự kiểm tra hiệu năng
 (chữ chuyển đỏ khi FPS dưới 45).
 
@@ -90,6 +92,54 @@ Ghi chú:
 - Bảng điểm dừng chỉ hiện ở chế độ Du thuyền; khi đeo kính, bảng HTML không hiển thị nên
   dùng bảng thuyết minh 3D trong không gian thay thế.
 
+## Điều khiển trên kính VR (tay cầm Meta Quest)
+
+Bấm nút kính VR ở góc phải dưới để vào chế độ VR. Mỗi tay cầm có một tia laser: chĩa vào biểu tượng
+**i** rồi bóp cò để mở bảng thuyết minh (bóp cò vào bảng để đóng).
+
+| Tay cầm | Tác dụng |
+|---|---|
+| Cần gạt **trái** | Đi tới / lùi / sang ngang theo hướng nhìn (trên boong: đi lại trên boong) |
+| Cần gạt **phải** sang trái / phải | Xoay nhanh 30° mỗi lần gạt (snap turn, đỡ chóng mặt hơn xoay mượt) |
+| Cần gạt **phải** đẩy lên → ngắm → thả | Dịch chuyển tức thời (teleport) tới chỗ vòng cung chạm. Cung **xanh** = tới được, **đỏ** = không (rơi vào đảo, nhà bè, ra khỏi boong, ra ngoài vùng chơi) |
+| Nút **grip** trái / phải | Hạ xuống / bay lên (chế độ Tự do) |
+| Nút **X** | Đổi chế độ Du thuyền / Tự do |
+| Nút **Y** | Đổi thời điểm: Ngày → Hoàng hôn → Đêm |
+| Nút **A** | Đóng bảng thuyết minh đang mở; nếu không có bảng: **Vào hang** (khi thuyền neo ở Hang Sửng Sốt hoặc bay gần cửa hang) / **Ra khỏi hang** |
+| Nút **B** | Tắt / bật âm thanh |
+
+Mỗi lần bấm nút có một dòng thông báo nhỏ hiện trước mắt khoảng 2 giây (vì bảng HTML không hiển thị
+trong kính). Mô hình tay cầm cũng được vẽ bằng code (thân trụ + vòng cam) nên không cần tải file.
+
+## Điều khiển trên điện thoại / máy tính bảng
+
+Màn hình cảm ứng được nhận ra tự động:
+- **Vuốt** trên màn hình để xoay góc nhìn; **nghiêng máy** để nhìn quanh (con quay hồi chuyển — trên iPhone
+  trình duyệt sẽ hỏi quyền khi bấm *Bắt đầu*, chọn *Cho phép*).
+- **Cần ảo** góc dưới trái: kéo núm để đi lại.
+- Cột nút góc dưới phải: **🕊 Bay tự do / ⛵ Lên thuyền** đổi chế độ; ở chế độ Tự do có thêm **▲ / ▼**
+  để bay lên / hạ xuống.
+- Chạm vào biểu tượng **i** để mở bảng thuyết minh. Bảng hướng dẫn phím và bảng FPS được ẩn bớt cho
+  đỡ chật màn hình.
+
+## Chất lượng đồ hoạ Cao / Thấp
+
+Nút **⚙ Cao / ⚙ Thấp** ở cụm nút thời điểm (hoặc phím `Q`):
+
+| | Cao | Thấp |
+|---|---|---|
+| Độ phân giải vẽ | 100 % (tối đa 1,5× trên màn hình mật độ điểm ảnh cao) | 75 % |
+| Bóng đảo phản chiếu trên nước | 12 đảo gần nhất | 4 đảo |
+| Vệt đèn lồng phản chiếu (ban đêm) | 8 đèn | 4 đèn |
+| Khoảng cách đảo dùng mô hình chi tiết | 150 m | 80 m |
+| Độ phân giải trong kính VR | 100 % | 80 % |
+
+- Lần đầu chạy: máy tính mặc định **Cao**, điện thoại / kính VR mặc định **Thấp**.
+- Nếu 8 giây đầu sau khi bấm *Bắt đầu* đo được trung bình dưới 38 FPS, chương trình **tự chuyển sang
+  Thấp** và báo một dòng. Lựa chọn bằng tay được ghi nhớ (localStorage) và không bị tự đổi nữa.
+- Độ phân giải trong kính chỉ đổi được trước khi vào VR (giới hạn của WebXR); đổi khi đang ở trong kính
+  sẽ có tác dụng ở lần vào VR sau.
+
 ## Cấu trúc thư mục
 
 ```
@@ -98,7 +148,8 @@ WebVR-HaLong/
 ├── lib/aframe.min.js   A-Frame 1.6.0 (bản local, thiếu thì tự tải từ CDN)
 ├── css/style.css       giao diện HUD
 └── js/
-    ├── tien-ich.js     random có seed, noise, texture canvas, GLSL dùng chung, sương mù theo hướng
+    ├── tien-ich.js     random có seed, noise, texture canvas, GLSL dùng chung, sương mù theo hướng,
+    │                   cấu hình chất lượng Cao / Thấp
     ├── bau-troi.js     bầu trời gradient, mặt trời, mây, ánh sáng, bảng màu
     ├── bien.js         mặt biển có sóng (shader), phản chiếu trời + bóng đảo, vệt sóng sau thuyền
     ├── thuyen.js       lộ trình CatmullRom + 5 điểm dừng, mô hình thuyền buồm, du thuyền tự động
@@ -108,9 +159,11 @@ WebVR-HaLong/
     ├── sinh-vat.js     đàn hải âu (boids, vỗ cánh trong shader) + đom đóm ban đêm
     ├── diem-thong-tin.js biểu tượng "i" bấm được + bảng thuyết minh 3D chữ vẽ bằng canvas
     ├── am-thanh.js     âm thanh procedural (Web Audio): sóng, gió, hải âu, dế, giọt nước + vang hang
-    ├── dieu-khien.js   2 chế độ: đứng trên boong / bay tự do (WASD, chuột, va chạm, bay vào hang)
+    ├── dieu-khien.js   2 chế độ: đứng trên boong / bay tự do (WASD, chuột, va chạm, bay vào hang);
+    │                   tay cầm VR: cần gạt, snap turn, teleport theo vòng cung, các nút
     └── giao-dien.js    HUD: màn hình chờ, hướng dẫn, chip + nút Vào hang, bảng điểm dừng,
-                        nút thời điểm + loa, bản đồ nhỏ, chụp ảnh, FPS / draw call
+                        nút thời điểm + loa + chất lượng, bản đồ nhỏ, chụp ảnh, FPS / draw call,
+                        cần ảo + nút cảm ứng cho điện thoại, thông báo 3D trong kính
 ```
 
 ## Tiến độ
@@ -119,5 +172,5 @@ WebVR-HaLong/
 - [x] **Mốc 2**: đảo đá vôi procedural đầy đủ, thuyền buồm, du thuyền tự động theo lộ trình
 - [x] **Mốc 3**: làng chài, hang động, sinh vật, chu kỳ ngày/đêm
 - [x] **Mốc 4**: hotspot thông tin, HUD, minimap, âm thanh, màn hình chờ, chụp ảnh
-- [ ] Mốc 5: WebXR (tay cầm, teleport, snap turn), điện thoại, tối ưu, chế độ chất lượng
+- [x] **Mốc 5**: WebXR (tay cầm, teleport, snap turn), điện thoại, tối ưu, chế độ chất lượng
 - [ ] Mốc 6: README đầy đủ + BAO_CAO.md

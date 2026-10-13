@@ -524,6 +524,54 @@
     }
   };
 
+  /* -----------------------------------------------------------------------
+   * CHẤT LƯỢNG ĐỒ HOẠ: 'cao' | 'thap' (nút ⚙ / phím Q, nhớ trong localStorage)
+   *  Máy yếu (Intel HD 620, điện thoại, kính độc lập) nghẽn ở số ĐIỂM ẢNH phải tô
+   *  (mặt biển là shader nặng nhất, phủ nửa màn hình) → đòn bẩy chính là vẽ ở độ
+   *  phân giải thấp hơn rồi phóng lên; thêm vài cắt giảm nhỏ trong shader biển, đảo.
+   *    tiLePixel   : nhân với mật độ điểm ảnh của màn hình (0,75 → bớt ~44 % điểm ảnh)
+   *    daoPhanChieu: số đảo được tính bóng phản chiếu trên mặt nước (vòng lặp shader)
+   *    denPhanChieu: số đèn lồng có vệt sáng trên mặt nước ban đêm
+   *    nguongLOD   : đảo cách xa hơn bao nhiêu mét thì dùng bản ít chi tiết
+   * --------------------------------------------------------------------- */
+  var CAU_HINH_CHAT_LUONG = {
+    cao:  { tiLePixel: 1,    mdpToiDa: 1.5, daoPhanChieu: 12, denPhanChieu: 8, nguongLOD: 150 },
+    thap: { tiLePixel: 0.75, mdpToiDa: 1,   daoPhanChieu: 4,  denPhanChieu: 4, nguongLOD: 80 }
+  };
+  var KHOA_CHAT_LUONG = 'halong-chat-luong';
+  var daLuu = null;
+  try { daLuu = window.localStorage.getItem(KHOA_CHAT_LUONG); } catch (e) { /* bị chặn → coi như chưa chọn */ }
+  HALONG.chatLuong = {
+    // Chưa chọn lần nào: điện thoại / kính VR độc lập mặc định THẤP, máy tính mặc định CAO
+    // (giao-dien.js tự hạ xuống Thấp nếu đo thấy FPS quá thấp lúc đầu)
+    ten: daLuu === 'thap' || daLuu === 'cao' ? daLuu
+      : (AFRAME.utils.device.isMobile() || AFRAME.utils.device.isMobileVR() ? 'thap' : 'cao'),
+    daChonTay: daLuu === 'thap' || daLuu === 'cao',
+    cauHinh: null,
+    // Đổi mức. nguoiChon = true: người dùng tự bấm → ghi nhớ, không tự đổi nữa
+    datMuc: function (ten, nguoiChon) {
+      if (!CAU_HINH_CHAT_LUONG[ten]) return;
+      this.ten = ten;
+      this.cauHinh = CAU_HINH_CHAT_LUONG[ten];
+      if (nguoiChon) {
+        this.daChonTay = true;
+        try { window.localStorage.setItem(KHOA_CHAT_LUONG, ten); } catch (e) { /* không lưu được thì thôi */ }
+      }
+      var sc = document.querySelector('a-scene');
+      if (sc && sc.renderer) {
+        var xr = sc.renderer.xr;
+        if (!xr || !xr.isPresenting) {
+          var mdp = Math.min(window.devicePixelRatio || 1, this.cauHinh.mdpToiDa);
+          sc.renderer.setPixelRatio(mdp * this.cauHinh.tiLePixel);   // three.js tự đổi cỡ canvas theo
+          // Kính VR: độ phân giải khung hình của kính chỉ đặt được TRƯỚC khi vào kính
+          if (xr && xr.setFramebufferScaleFactor) xr.setFramebufferScaleFactor(this.cauHinh.tiLePixel < 1 ? 0.8 : 1);
+        }
+      }
+      if (sc) sc.emit('doi-chat-luong', { ten: ten });
+    }
+  };
+  HALONG.chatLuong.cauHinh = CAU_HINH_CHAT_LUONG[HALONG.chatLuong.ten];
+
   // Phím bấm khi đang gõ chữ (ô nhập của A-Frame Inspector Ctrl+Alt+I...) thì không phải lệnh điều khiển
   HALONG.dangGoChu = function (e) {
     var el = e.target;
