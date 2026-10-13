@@ -4,7 +4,7 @@ Trải nghiệm thực tế ảo chạy trên trình duyệt (WebXR), làm bằn
 Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng code**: không dùng ảnh, mô hình 3D hay
 âm thanh tải từ ngoài nên chạy offline được 100%.
 
-> Đây là bản nháp README (đang ở Mốc 2). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
+> Đây là bản nháp README (đang ở Mốc 3). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
 
 ## Cách chạy
 
@@ -23,6 +23,15 @@ Dòng đó chỉ cảnh báo chung về việc tải ảnh/mô hình. Dự án n
   (khoảng 0,9 km), dừng ở 5 điểm: Vịnh Hạ Long → Đảo Ti Tốp → Hang Sửng Sốt → Làng chài Cửa Vạn →
   Hòn Gà Chọi. Mỗi điểm dừng hiện bảng giới thiệu ngắn.
 - **Tự do**: rời thuyền, bay trên mặt nước để khám phá; không đi xuyên đảo.
+  Riêng đảo Bồ Hòn có **cửa hang Sửng Sốt** quay về phía điểm dừng: bay thẳng vào cửa vòm (độ cao
+  khoảng 3–8 m) để đi qua đường hầm vào khoang hang có nhũ đá và đèn màu.
+
+## Thời điểm trong ngày
+
+Ba nút **Ngày / Hoàng hôn / Đêm** ở góc trên (hoặc phím `1` `2` `3`). Bầu trời, mặt trời / mặt trăng,
+mây, màu nước, sương mù và ánh sáng đổi dần trong 4 giây. Ban đêm có sao, trăng, đèn lồng trên thuyền và
+ở làng chài (phản chiếu thành vệt sáng trên mặt nước), cửa sổ sáng đèn, đom đóm quanh chân đảo;
+hải âu chỉ bay ban ngày và lúc hoàng hôn.
 
 Bản đồ trong mô hình là **minh họa**: vị trí các điểm không đúng tỉ lệ thật.
 
@@ -36,6 +45,7 @@ Bản đồ trong mô hình là **minh họa**: vị trí các điểm không đ
 | `M` | Đổi chế độ Du thuyền / Tự do |
 | `Space` / `C` | Bay lên / hạ xuống (chế độ Tự do) |
 | `N` | Thuyền rời điểm dừng ngay, không chờ hết giờ |
+| `1` `2` `3` | Ngày / Hoàng hôn / Đêm |
 | `H` | Ẩn / hiện bảng hướng dẫn |
 
 Góc dưới bên trái là bảng **FPS · Draw call · Tam giác** để tự kiểm tra hiệu năng
@@ -61,15 +71,18 @@ WebVR-HaLong/
     ├── bien.js         mặt biển có sóng (shader), phản chiếu trời + bóng đảo, vệt sóng sau thuyền
     ├── thuyen.js       lộ trình CatmullRom + 5 điểm dừng, mô hình thuyền buồm, du thuyền tự động
     ├── dao-da-voi.js   60 đảo procedural (InstancedMesh + 2 mức chi tiết) + đảo nổi bật
-    ├── dieu-khien.js   2 chế độ: đứng trên boong / bay tự do (WASD, chuột, va chạm, giới hạn)
-    └── giao-dien.js    HUD: hướng dẫn, chip chế độ, bảng điểm dừng, FPS / draw call
+    ├── lang-chai.js    làng chài nổi: nhà bè, lối đi, lồng bè, lưới, thuyền nhỏ, đèn lồng (1 texture atlas)
+    ├── hang-dong.js    hang Sửng Sốt: khoét cửa vòm vào đảo Bồ Hòn, đường hầm + khoang, nhũ đá, đèn màu
+    ├── sinh-vat.js     đàn hải âu (boids, vỗ cánh trong shader) + đom đóm ban đêm
+    ├── dieu-khien.js   2 chế độ: đứng trên boong / bay tự do (WASD, chuột, va chạm, bay vào hang)
+    └── giao-dien.js    HUD: hướng dẫn, chip chế độ, bảng điểm dừng, nút Ngày/Hoàng hôn/Đêm, FPS / draw call
 ```
 
 ## Tiến độ
 
 - [x] **Mốc 1**: khung dự án, biển, bầu trời, vài đảo, điều khiển WASD/chuột
 - [x] **Mốc 2**: đảo đá vôi procedural đầy đủ, thuyền buồm, du thuyền tự động theo lộ trình
-- [ ] Mốc 3: làng chài, hang động, sinh vật, chu kỳ ngày/đêm
+- [x] **Mốc 3**: làng chài, hang động, sinh vật, chu kỳ ngày/đêm
 - [ ] Mốc 4: hotspot thông tin, HUD, minimap, âm thanh, màn hình chờ, chụp ảnh
 - [ ] Mốc 5: WebXR (tay cầm, teleport, snap turn), điện thoại, tối ưu, chế độ chất lượng
 - [ ] Mốc 6: README đầy đủ + BAO_CAO.md

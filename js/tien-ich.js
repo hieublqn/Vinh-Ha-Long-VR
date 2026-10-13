@@ -150,7 +150,12 @@
     uMauNuocSau:   { value: new THREE.Color() },          // màu nước sâu
     uMauNuocNong:  { value: new THREE.Color() },          // màu xanh ngọc khi nắng xuyên sóng
     uMatDoSuong:   { value: 0.004 },                      // độ dày sương mù
-    uThuyen:       { value: new THREE.Vector4() }         // thuyền: x, z, góc hướng, tốc độ (0..1)
+    uThuyen:       { value: new THREE.Vector4() },        // thuyền: x, z, góc hướng, tốc độ (0..1)
+    // Mốc 3 – ngày/đêm
+    uDem:          { value: 0 },                          // 0 = ban ngày/hoàng hôn, 1 = đêm hẳn
+    uMauMay:       { value: new THREE.Color() },          // màu nền của mây
+    uMauDia:       { value: new THREE.Color() },          // màu đĩa mặt trời / mặt trăng (HDR)
+    uKichThuocDia: { value: 0.99986 }                     // cos(bán kính góc của đĩa): càng gần 1 đĩa càng nhỏ
   };
 
   /* -----------------------------------------------------------------------
@@ -224,6 +229,8 @@
    *        vPhapTuyenTG) cho các hiệu ứng riêng;
    *      - chèn thêm đoạn GLSL riêng của từng loại vật liệu:
    *          dinhKhaiBao / manhKhaiBao : khai báo thêm (uniform, hàm...)
+   *          dinhBienDang : chạy trong vertex shader ngay sau khi có 'transformed'
+   *                         (toạ độ đỉnh) → dùng để uốn/động hình (cánh chim vỗ...)
    *          manhSauMau   : chạy ngay sau khi có màu gốc (diffuseColor)
    *          manhTruocSuong : chạy sau khi tính ánh sáng, trước sương mù
    *          uniforms     : uniform riêng
@@ -247,6 +254,7 @@
           'varying vec3 vPhapTuyenTG;',
           tuyChon.dinhKhaiBao || ''
         ].join('\n'))
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + (tuyChon.dinhBienDang || ''))
         .replace('#include <fog_vertex>', [
           '#include <fog_vertex>',
           'vec4 viTriTG = vec4(transformed, 1.0);',
@@ -294,6 +302,156 @@
   // Trường hợp đơn giản nhất: chỉ gắn sương mù theo hướng
   HALONG.apDungSuongMu = function (vatLieu) {
     return HALONG.vaShader(vatLieu, { ten: 'suong-mu' });
+  };
+
+  /* -----------------------------------------------------------------------
+   * 6b. ĐIỂM SÁNG PHÁT QUANG (quầng đèn lồng, đom đóm, đốm sáng trong hang...)
+   *    Dùng THREE.Points: mỗi điểm GPU vẽ thành 1 hình vuông luôn quay mặt về
+   *    camera, tô bằng texture vầng sáng tròn, cộng dồn ánh sáng (Additive
+   *    blending) → trông như phát sáng. Hàng trăm điểm chỉ tốn 1 draw call.
+   *    tuyChon:
+   *      viTri     : mảng [x, y, z, x, y, z, ...]
+   *      mau       : mảng [r, g, b, ...] (0..1) – hoặc 1 mã màu chung
+   *      kichThuoc : đường kính vầng sáng (m)
+   *      nhapNhay  : 0..1 – mức nhấp nháy (đom đóm nhấp nháy mạnh)
+   *      troi      : biên độ trôi lơ lửng (m)
+   *      sangNgay  : độ sáng khi trời chưa tối (0 = chỉ sáng ban đêm)
+   * --------------------------------------------------------------------- */
+  var textureQuang = null;
+  function layTextureQuang() {
+    if (textureQuang) return textureQuang;
+    textureQuang = HALONG.taoTextureCanvas(64, 64, function (ctx, w, h) {
+      var g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.18, 'rgba(255,255,255,0.75)');
+      g.addColorStop(0.45, 'rgba(255,255,255,0.18)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    });
+    return textureQuang;
+  }
+
+  var DINH_DIEM_SANG = [
+    'attribute vec3 color;',
+    'attribute float hat;                 // số ngẫu nhiên riêng của từng điểm',
+    'uniform float uThoiGian;',
+    'uniform float uDem;',
+    'uniform float uKichThuoc, uTiLeDiem, uNhapNhay, uTroi, uSangNgay;',
+    'varying vec3 vMau;',
+    'varying float vSang;',
+    'varying vec3 vViTriTG;',
+    'void main() {',
+    '  vec3 p = position;',
+    '  // trôi lơ lửng (đom đóm bay lượn, đốm sáng trôi trong hang)',
+    '  p += uTroi * vec3(sin(uThoiGian * 0.7 + hat * 12.0),',
+    '                    0.6 * sin(uThoiGian * 0.9 + hat * 7.0),',
+    '                    cos(uThoiGian * 0.6 + hat * 5.0));',
+    '  vec4 tg = modelMatrix * vec4(p, 1.0);',
+    '  vViTriTG = tg.xyz;',
+    '  vec4 mv = viewMatrix * tg;',
+    '  gl_Position = projectionMatrix * mv;',
+    '  float nhay = mix(1.0, 0.25 + 0.75 * max(sin(uThoiGian * (1.5 + hat * 2.5) + hat * 40.0), 0.0), uNhapNhay);',
+    '  vSang = nhay * mix(uSangNgay, 1.0, uDem);',
+    '  vMau = color;',
+    '  // kích thước (pixel) = kích thước thật / khoảng cách × tỉ lệ màn hình; tắt hẳn khi không sáng',
+    '  gl_PointSize = vSang < 0.01 ? 0.0 : uKichThuoc * uTiLeDiem / max(-mv.z, 0.5);',
+    '}'
+  ].join('\n');
+
+  var MANH_DIEM_SANG = [
+    'uniform sampler2D uQuang;',
+    'varying vec3 vMau;',
+    'varying float vSang;',
+    'varying vec3 vViTriTG;',
+    HALONG.glsl.bauTroi,
+    'void main() {',
+    '  float a = texture2D(uQuang, gl_PointCoord).a;',
+    '  // ở xa thì mờ dần trong sương',
+    '  float suong = heSoSuong(length(vViTriTG - cameraPosition));',
+    '  gl_FragColor = vec4(vMau * vSang * a * (1.0 - suong), 1.0);',
+    '  #include <tonemapping_fragment>',
+    '  #include <colorspace_fragment>',
+    '}'
+  ].join('\n');
+
+  HALONG.taoDiemSang = function (tuyChon) {
+    var n = tuyChon.viTri.length / 3;
+    var hinh = new THREE.BufferGeometry();
+    hinh.setAttribute('position', new THREE.Float32BufferAttribute(tuyChon.viTri, 3));
+    var mau = tuyChon.mau;
+    if (!Array.isArray(mau) && !(mau instanceof Float32Array)) {
+      var c = new THREE.Color(mau || '#ffffff'), m = [];
+      for (var i = 0; i < n; i++) m.push(c.r, c.g, c.b);
+      mau = m;
+    }
+    hinh.setAttribute('color', new THREE.Float32BufferAttribute(mau, 3));
+    var rand = HALONG.taoRandom(tuyChon.hatGiong || 99), hat = [];
+    for (i = 0; i < n; i++) hat.push(rand());
+    hinh.setAttribute('hat', new THREE.Float32BufferAttribute(hat, 1));
+
+    var uniforms = Object.assign({
+      uQuang: { value: layTextureQuang() },
+      uKichThuoc: { value: tuyChon.kichThuoc || 1 },
+      uTiLeDiem: { value: 500 },
+      uNhapNhay: { value: tuyChon.nhapNhay || 0 },
+      uTroi: { value: tuyChon.troi || 0 },
+      uSangNgay: { value: tuyChon.sangNgay === undefined ? 0 : tuyChon.sangNgay }
+    }, HALONG.uniformChung);
+    var vatLieu = new THREE.ShaderMaterial({
+      uniforms: uniforms,
+      vertexShader: DINH_DIEM_SANG,
+      fragmentShader: MANH_DIEM_SANG,
+      transparent: true,
+      depthWrite: false,                     // không che vật phía sau
+      blending: THREE.AdditiveBlending       // cộng dồn ánh sáng → trông như phát sáng
+    });
+    var diem = new THREE.Points(hinh, vatLieu);
+    diem.frustumCulled = false;
+    // Mỗi lần vẽ: tính tỉ lệ đổi "mét" → "pixel" theo chiều cao màn hình và góc nhìn camera
+    var kt = new THREE.Vector2();
+    diem.onBeforeRender = function (renderer, scene, camera) {
+      renderer.getDrawingBufferSize(kt);
+      var fov = camera.isPerspectiveCamera ? camera.fov : 80;
+      uniforms.uTiLeDiem.value = kt.y / (2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2));
+    };
+    return diem;
+  };
+
+  /* -----------------------------------------------------------------------
+   * 6c. ĐÈN LỒNG – dùng chung cho thuyền và làng chài
+   *    Hình: thân đỏ hình trống + 2 nắp sẫm + tua rua. Vật liệu tự phát sáng
+   *    mạnh dần khi trời tối (uDem), không cần đèn thật cho từng chiếc.
+   * --------------------------------------------------------------------- */
+  HALONG.taoDenLong = function (x, y, z, to) {
+    var H = HALONG.hinh;
+    to = to || 1;
+    var than = new THREE.CylinderGeometry(0.17 * to, 0.17 * to, 0.34 * to, 10, 1);
+    // phình giữa thân cho giống lồng đèn: đỉnh ở giữa chiều cao đẩy ra ngoài
+    var p = than.attributes.position;
+    for (var i = 0; i < p.count; i++) {
+      var k = 1 + 0.35 * (1 - Math.pow(p.getY(i) / (0.17 * to), 2));
+      p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k);
+    }
+    than.computeVertexNormals();
+    var ds = [
+      H.toMau(H.dat(than, x, y, z), '#e0352b'),
+      H.toMau(H.dat(new THREE.CylinderGeometry(0.1 * to, 0.13 * to, 0.05 * to, 8), x, y + 0.19 * to, z), '#2a1a10'),
+      H.toMau(H.dat(new THREE.CylinderGeometry(0.13 * to, 0.1 * to, 0.05 * to, 8), x, y - 0.19 * to, z), '#2a1a10'),
+      H.toMau(H.dat(new THREE.CylinderGeometry(0.02 * to, 0.04 * to, 0.22 * to, 5), x, y - 0.32 * to, z), '#f2c14a'),
+      H.toMau(H.dat(new THREE.CylinderGeometry(0.01, 0.01, 0.3 * to, 4), x, y + 0.36 * to, z), '#2a1a10')   // dây treo
+    ];
+    ds.forEach(function (h) { h.deleteAttribute('uv'); });
+    return ds;
+  };
+
+  HALONG.vatLieuDenLong = function () {
+    return HALONG.vaShader(new THREE.MeshLambertMaterial({ vertexColors: true }), {
+      ten: 'den-long',
+      manhKhaiBao: 'uniform float uDem;',
+      // phần thân đỏ tự phát sáng: yếu lúc hoàng hôn, rực khi trời tối
+      manhTruocSuong: 'gl_FragColor.rgb += diffuseColor.rgb * mix(0.2, 3.2, uDem);'
+    });
   };
 
   /* -----------------------------------------------------------------------

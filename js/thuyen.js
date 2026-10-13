@@ -233,6 +233,26 @@
     });
   }
 
+  // "Mặt nạ" cửa sổ: cùng bố cục với texture cabin, chỉ ô kính tô màu vàng ấm,
+  // còn lại đen → ban đêm cộng mặt nạ này vào màu cabin = cửa sổ sáng đèn.
+  function taoMatNaCuaSo() {
+    var tex = HALONG.taoTextureCanvas(512, 256, function (ctx, w, h) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+      for (var i = 0; i < 3; i++) {
+        var x0 = 40 + i * 160, y0 = 60, ww = 110, hh = 100;
+        var g = ctx.createLinearGradient(0, y0, 0, y0 + hh);
+        g.addColorStop(0, '#ffd890');
+        g.addColorStop(1, '#ff9a40');
+        ctx.fillStyle = g;
+        ctx.fillRect(x0, y0, ww, hh);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x0 + ww / 2 - 3, y0, 6, hh);   // song cửa không sáng
+      }
+    });
+    return tex;
+  }
+
   /* ---------- Thân thuyền (lưới dựng theo các hàm ở trên) ---------- */
   function taoThan() {
     var NL = 48, NS = 10;                     // 48 lát dọc thân, mỗi bên 10 đỉnh
@@ -442,7 +462,13 @@
       var vlGo = HALONG.apDungSuongMu(new THREE.MeshLambertMaterial({
         map: taoTextureGo(), vertexColors: true, side: THREE.DoubleSide
       }));
-      var vlCabin = HALONG.apDungSuongMu(new THREE.MeshLambertMaterial({ map: taoTextureCabin() }));
+      // Cabin: ban đêm cửa sổ sáng đèn (cộng thêm "mặt nạ" cửa sổ × uDem)
+      var vlCabin = HALONG.vaShader(new THREE.MeshLambertMaterial({ map: taoTextureCabin() }), {
+        ten: 'cabin',
+        uniforms: { uMatNa: { value: taoMatNaCuaSo() } },
+        manhKhaiBao: 'uniform sampler2D uMatNa;\nuniform float uDem;',
+        manhTruocSuong: 'gl_FragColor.rgb += texture2D(uMatNa, vMapUv).rgb * uDem * 2.2;'
+      });
       // Buồm: khi nhìn ngược về phía mặt trời, nắng xuyên qua vải → buồm rực sáng
       var vlBuom = HALONG.vaShader(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), {
         ten: 'buom',
@@ -453,11 +479,38 @@
         ].join('\n')
       });
 
-      // --- Gộp: 3 nhóm vật liệu → 3 draw call ---
+      // --- Đèn lồng: 4 góc mái cabin + 2 giữa mái hai bên ---
+      var xMai = rongCabin / 2 + 0.05, yDen = mai - 0.45;
+      var viTriDen = [
+        [-xMai, CABIN.zDau - 0.1], [xMai, CABIN.zDau - 0.1],
+        [-xMai, zGiuaCabin], [xMai, zGiuaCabin],
+        [-xMai, CABIN.zCuoi - 0.2], [xMai, CABIN.zCuoi - 0.2]
+      ];
+      var denLong = [], diemQuang = [];
+      HALONG.thuyen.denLongCucBo = [];
+      viTriDen.forEach(function (v) {
+        denLong = denLong.concat(HALONG.taoDenLong(v[0], yDen, v[1], 1.1));
+        diemQuang.push(v[0], yDen, v[1]);
+        HALONG.thuyen.denLongCucBo.push(new THREE.Vector3(v[0], yDen, v[1]));
+      });
+
+      // --- Gộp: mỗi nhóm vật liệu → 1 draw call ---
       var nhom = new THREE.Group();
       nhom.add(new THREE.Mesh(H.gop(go), vlGo));
       nhom.add(new THREE.Mesh(hinhCabin, vlCabin));
       nhom.add(new THREE.Mesh(H.gop(buom, true), vlBuom));
+      nhom.add(new THREE.Mesh(H.gop(denLong), HALONG.vatLieuDenLong()));
+      // Quầng sáng quanh đèn (mờ lúc hoàng hôn, rực khi tối)
+      nhom.add(HALONG.taoDiemSang({ viTri: diemQuang, mau: '#ffb04a', kichThuoc: 1.8, sangNgay: 0.12, hatGiong: 5 }));
+
+      // 1 đèn THẬT (PointLight) soi sáng boong khi trời tối. Chỉ dùng 1 đèn vì mỗi
+      // đèn thật làm MỌI vật liệu phải tính thêm ánh sáng → tốn GPU.
+      // Tạo sẵn ngay từ đầu (cường độ 0 ban ngày) để không phải biên dịch lại shader.
+      this.denBoong = new THREE.PointLight('#ffb060', 0, 24, 2);
+      this.denBoong.position.set(0, doCaoBoong(tTheoZ(-3)) + 3.2, -3);
+      nhom.add(this.denBoong);
+      HALONG.thuyen.denBoong = this.denBoong;
+
       this.el.setObject3D('mesh', nhom);
     },
 
@@ -580,6 +633,17 @@
       tt.conLai = ((LO_TRINH.diemDung[this.diemTiep].s - this.s) % L + L) % L;
       tt.cho = Math.max(this.cho, 0);
       HALONG.uniformChung.uThuyen.value.set(x, z, goc, this.v / this.data.tocDo);
+
+      // Vị trí THẾ GIỚI của các đèn lồng (mặt biển dùng để vẽ vệt đèn phản chiếu ban đêm)
+      var dem = HALONG.uniformChung.uDem.value;
+      if (tt.denLongCucBo) {
+        o.updateMatrixWorld();
+        if (!tt.denLongTheGioi) tt.denLongTheGioi = tt.denLongCucBo.map(function () { return new THREE.Vector3(); });
+        for (var i = 0; i < tt.denLongCucBo.length; i++) {
+          tt.denLongTheGioi[i].copy(tt.denLongCucBo[i]).applyMatrix4(o.matrixWorld);
+        }
+      }
+      if (tt.denBoong) tt.denBoong.intensity = dem * 45;
     }
   });
 })();

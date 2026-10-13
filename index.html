@@ -34,6 +34,9 @@
   <script src="js/bien.js"></script>
   <script src="js/thuyen.js"></script>      <!-- tạo lộ trình (HALONG.LO_TRINH): đảo dùng để chừa luồng -->
   <script src="js/dao-da-voi.js"></script>
+  <script src="js/lang-chai.js"></script>
+  <script src="js/hang-dong.js"></script>
+  <script src="js/sinh-vat.js"></script>
   <script src="js/dieu-khien.js"></script>
   <script src="js/giao-dien.js"></script>
 </head>
@@ -59,7 +62,8 @@
     loading-screen="dotsColor: #ffb26b; backgroundColor: #1b1530"
     giao-dien>
 
-    <!-- Bầu trời hoàng hôn + mặt trời + ánh sáng -->
+    <!-- Bầu trời + mặt trời/mặt trăng + ánh sáng. Bắt đầu lúc hoàng hôn;
+         phím 1 2 3 hoặc nút góc phải để đổi Ngày / Hoàng hôn / Đêm -->
     <a-entity id="bau-troi" bau-troi="cheDo: hoangHon"></a-entity>
 
     <!-- Mặt biển có sóng -->
@@ -67,6 +71,15 @@
 
     <!-- Quần đảo đá vôi: 60 đảo ngẫu nhiên (có seed) + các đảo nổi bật theo lộ trình -->
     <a-entity id="quan-dao" dao-da-voi="soDao: 60; hatGiong: 1994"></a-entity>
+
+    <!-- Làng chài nổi (nhà bè, lồng bè, thuyền nan, đèn lồng) -->
+    <a-entity id="lang-chai" lang-chai></a-entity>
+
+    <!-- Hang Sửng Sốt: lòng hang + nhũ đá phát quang (cửa hang khoét trong đảo Bồ Hòn) -->
+    <a-entity id="hang-dong" hang-dong></a-entity>
+
+    <!-- Sinh vật: đàn hải âu bay theo thuyền, đom đóm ban đêm -->
+    <a-entity id="sinh-vat" hai-au dom-dom></a-entity>
 
     <!-- Thuyền buồm + du thuyền tự động theo lộ trình.
          Lưu ý: A-Frame chạy tick() theo LOẠI component (thứ tự đăng ký), không theo

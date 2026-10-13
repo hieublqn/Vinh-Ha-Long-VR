@@ -242,11 +242,13 @@
     return tex;
   }
 
-  // Vật liệu chung cho mọi đảo: Lambert (rẻ hơn PBR, hợp GPU tích hợp) + vân triplanar
-  function taoVatLieuDao() {
-    return HALONG.vaShader(new THREE.MeshLambertMaterial({ vertexColors: true }), {
-      ten: 'dao',
-      uniforms: { uChiTiet: { value: taoTextureChiTiet() } },
+  // Vật liệu chung cho mọi đảo: Lambert (rẻ hơn PBR, hợp GPU tích hợp) + vân triplanar.
+  // haiMat = true: vẽ cả mặt trong (dùng cho đảo Bồ Hòn có cửa hang khoét lỗ): mặt trong
+  // tô gần đen, nhìn qua cửa hang chỉ thấy đá tối chứ không thấy "xuyên" ra trời.
+  function taoVatLieuDao(texChiTiet, haiMat) {
+    return HALONG.vaShader(new THREE.MeshLambertMaterial({ vertexColors: true, side: haiMat ? THREE.DoubleSide : THREE.FrontSide }), {
+      ten: haiMat ? 'dao-2mat' : 'dao',
+      uniforms: { uChiTiet: { value: texChiTiet } },
       manhKhaiBao: 'uniform sampler2D uChiTiet;',
       manhSauMau: [
         '// Triplanar: chiếu texture theo 3 trục X, Y, Z rồi trộn theo hướng bề mặt',
@@ -260,7 +262,8 @@
         '         + texture2D(uChiTiet, pTG.xy) * trongSo.z;',
         '// màu gốc là cây xanh (G > R) → dùng vân tán lá, còn lại dùng vân đá',
         'float laCay = smoothstep(0.0, 0.03, diffuseColor.g - diffuseColor.r);',
-        'diffuseColor.rgb *= mix(0.62 + 0.76 * van.r, 0.55 + 0.9 * van.g, laCay);'
+        'diffuseColor.rgb *= mix(0.62 + 0.76 * van.r, 0.55 + 0.9 * van.g, laCay);',
+        haiMat ? 'if (!gl_FrontFacing) diffuseColor.rgb *= 0.06;   // mặt trong đảo: tối như hang' : ''
       ].join('\n')
     });
   }
@@ -330,7 +333,7 @@
   }
 
   function taoDaoNoiBat(noise) {
-    var hinhGop = [], dsDao = [];
+    var hinhGop = [], hinhHaiMat = [], dsDao = [];
     HALONG.daoNoiBat = {};
     HALONG.LO_TRINH.diemDung.forEach(function (dd, so) {
       var vt = dd.vatThe;
@@ -352,7 +355,13 @@
         dsDao.push(dao);
       } else if (vt.loai === 'bo-hon') {
         dao = dungDao(KIEU_NOI_BAT['bo-hon'], hat, noise, vt.x, vt.z, 38, 1.4, 1.05, 0.85, gocToiDiemDung + 1.2);
-        hinhGop.push(dao.hinh);
+        // Khoét cửa Hang Sửng Sốt vào vách quay về phía điểm dừng (hang-dong.js)
+        if (HALONG.HangDong) {
+          HALONG.HangDong.khoet(dao.hinh, { x: vt.x, z: vt.z, goc: gocToiDiemDung });
+          hinhHaiMat.push(dao.hinh);
+        } else {
+          hinhGop.push(dao.hinh);
+        }
         dsDao.push(dao);
       } else if (vt.loai === 'ga-choi') {
         // 2 hòn đá đứng 2 bên, trục nối 2 hòn vuông góc với hướng nhìn từ điểm dừng
@@ -371,7 +380,11 @@
       }
       HALONG.daoNoiBat[vt.loai] = { x: vt.x, z: vt.z, gocToiDiemDung: gocToiDiemDung };
     });
-    return { hinh: hinhGop.length ? HALONG.hinh.gop(hinhGop) : null, dsDao: dsDao };
+    return {
+      hinh: hinhGop.length ? HALONG.hinh.gop(hinhGop) : null,
+      hinhHaiMat: hinhHaiMat.length ? HALONG.hinh.gop(hinhHaiMat) : null,
+      dsDao: dsDao
+    };
   }
 
   AFRAME.registerComponent('dao-da-voi', {
@@ -388,7 +401,8 @@
       var d = this.data;
       var rand = HALONG.taoRandom(d.hatGiong);
       var noise = HALONG.taoNoise(d.hatGiong);
-      var vatLieu = taoVatLieuDao();
+      var texChiTiet = taoTextureChiTiet();
+      var vatLieu = taoVatLieuDao(texChiTiet, false);
       var nhom = new THREE.Group();
 
       // 1) Các khuôn: mỗi khuôn 1 hạt, 2 mức chi tiết
@@ -403,6 +417,7 @@
       // 2) Đảo nổi bật (gộp thành 1 hình, luôn vẽ chi tiết cao)
       var noiBat = taoDaoNoiBat(noise);
       if (noiBat.hinh) nhom.add(new THREE.Mesh(noiBat.hinh, vatLieu));
+      if (noiBat.hinhHaiMat) nhom.add(new THREE.Mesh(noiBat.hinhHaiMat, taoVatLieuDao(texChiTiet, true)));
 
       // 3) Rải đảo ngẫu nhiên
       var dsDao = this.raiDao(rand, khuon, noiBat.dsDao);
@@ -441,6 +456,8 @@
       this.viTriCam = new THREE.Vector3();
       this.lanCapNhat = -Infinity;
       this.chiaMucChiTiet();
+      // Báo cho các component phụ thuộc đảo (hang động...) biết đảo đã dựng xong
+      this.el.sceneEl.emit('dao-da-xong');
     },
 
     tick: function (t) {

@@ -100,6 +100,7 @@
     update: function (cu) {
       if (cu.cheDo === undefined || cu.cheDo === this.data.cheDo) return;
       this.vanToc.set(0, 0, 0);
+      this.trongHang = false;
       // Lên lại thuyền: đứng ở chỗ quen thuộc gần mũi
       if (this.data.cheDo === 'du-thuyen') this.datLaiTrenBoong();
       this.el.sceneEl.emit('doi-che-do', { cheDo: this.data.cheDo });
@@ -202,6 +203,30 @@
 
       // Vị trí ĐẦU thật = rig + camera (khi đeo kính, đầu có thể lệch khỏi tâm rig)
       this.el.sceneEl.camera.getWorldPosition(this.dau);
+
+      // Hang Sửng Sốt: đầu đang ở trong vùng hang (đường hầm / khoang) thì KHÔNG xét va
+      // chạm với đảo (đảo Bồ Hòn bao quanh hang), mà giữ người dùng trong lòng hang.
+      var hang = HALONG.hangDong;
+      if (hang) {
+        if (hang.trong(this.dau)) {
+          this.trongHang = true;
+          var sanToiThieu = hang.sanY + 1.5;                  // đầu cao hơn sàn hang ≥ 1.5 m
+          if (this.dau.y < sanToiThieu) { p.y += sanToiThieu - this.dau.y; this.dau.y = sanToiThieu; }
+          return;
+        }
+        // (chỉ còn tính "đang trong hang" khi ở gần hang – tránh bị kéo về hang từ nơi khác)
+        if (this.trongHang && this.dau.distanceTo(hang.Cc) < 45) {
+          if (hang.raNgoaiCua(this.dau)) {
+            this.trongHang = false;                          // đã ra khỏi hang qua cửa
+          } else {
+            var truocKep = this.dau.clone();                 // định đâm vào vách → kéo về trong hang
+            hang.kep(this.dau);
+            p.add(this.dau.sub(truocKep));
+            return;
+          }
+        }
+        this.trongHang = false;
+      }
 
       // Mỗi đảo là 1 hình ELIP (đảo bị kéo dài theo 1 trục và xoay 1 góc).
       // Cách xét: đổi vị trí đầu sang hệ tọa độ riêng của đảo (xoay ngược), chia cho

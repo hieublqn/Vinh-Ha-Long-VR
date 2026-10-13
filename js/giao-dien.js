@@ -6,9 +6,10 @@
  *   - Bảng hướng dẫn phím (phím H để ẩn/hiện).
  *   - Chip chế độ (Du thuyền / Tự do) + điểm dừng kế tiếp và khoảng cách.
  *   - Bảng điểm dừng: hiện khi thuyền neo ở điểm tham quan.
+ *   - 3 nút Ngày / Hoàng hôn / Đêm (phím 1 2 3): chuyển màu trời mượt.
  *   - Bảng thông số hiệu năng: FPS, số draw call, số tam giác
  *     → để tự đo xem máy có chạy mượt không.
- * Mốc 4–5 sẽ thêm: minimap, menu, nút Ngày/Hoàng hôn/Đêm, chọn chất lượng,
+ * Mốc 4–5 sẽ thêm: minimap, menu, chọn chất lượng,
  * bảng thuyết minh 3D trong không gian.
  * ========================================================================= */
 (function () {
@@ -32,6 +33,7 @@
         '<li><kbd>M</kbd> đổi chế độ Du thuyền / Tự do</li>',
         '<li><kbd>Space</kbd> / <kbd>C</kbd> bay lên / xuống (Tự do)</li>',
         '<li><kbd>N</kbd> rời điểm dừng ngay</li>',
+        '<li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Ngày / Hoàng hôn / Đêm</li>',
         '<li><kbd>H</kbd> ẩn / hiện bảng này</li>',
         '</ul>'
       ].join('');
@@ -61,6 +63,26 @@
       sceneEl.addEventListener('roi-diem-dung', this.khiRoiDiemDung);
       sceneEl.addEventListener('doi-che-do', this.khiDoiCheDo);
 
+      // --- 3 nút chọn thời điểm (góc phải trên) – bấm được nên bật pointer-events ---
+      this.nutThoiDiem = document.createElement('div');
+      this.nutThoiDiem.id = 'nut-thoi-diem';
+      this.nutThoiDiem.className = 'hud-khung';
+      [['ngay', 'Ngày'], ['hoangHon', 'Hoàng hôn'], ['dem', 'Đêm']].forEach(function (td) {
+        var nut = document.createElement('button');
+        nut.type = 'button';
+        nut.textContent = td[1];
+        nut.dataset.ten = td[0];
+        nut.addEventListener('click', function () {
+          if (HALONG.datThoiDiem) HALONG.datThoiDiem(td[0]);
+          nut.blur();          // bỏ focus để phím Space không "bấm" lại nút này
+        });
+        this.nutThoiDiem.appendChild(nut);
+      }, this);
+      document.body.appendChild(this.nutThoiDiem);
+      this.khiDoiThoiDiem = this.danhDauThoiDiem.bind(this);
+      sceneEl.addEventListener('doi-thoi-diem', this.khiDoiThoiDiem);
+      this.danhDauThoiDiem({ detail: { ten: HALONG.thoiDiem || 'hoangHon' } });
+
       // --- Bảng thông số hiệu năng ---
       this.bangThongSo = document.createElement('div');
       this.bangThongSo.id = 'bang-thong-so';
@@ -74,6 +96,9 @@
       this.khiNhanPhim = function (e) {
         // !e.repeat: giữ phím lâu thì trình duyệt tự lặp keydown → bảng sẽ nhấp nháy
         if (e.code === 'KeyH' && !e.repeat) this.bangHuongDan.classList.toggle('an');
+        // Phím 1 2 3: Ngày / Hoàng hôn / Đêm
+        var phimSo = { Digit1: 'ngay', Digit2: 'hoangHon', Digit3: 'dem' }[e.code];
+        if (phimSo && !e.repeat && HALONG.datThoiDiem) HALONG.datThoiDiem(phimSo);
       }.bind(this);
       window.addEventListener('keydown', this.khiNhanPhim);
 
@@ -102,7 +127,15 @@
       this.el.removeEventListener('roi-diem-dung', this.khiRoiDiemDung);
       this.el.removeEventListener('doi-che-do', this.khiDoiCheDo);
       this.el.removeEventListener('renderstart', this.khiBatDauVe);
-      [this.bangHuongDan, this.bangThongSo, this.chipCheDo, this.bangDiemDung].forEach(function (el) { el.remove(); });
+      this.el.removeEventListener('doi-thoi-diem', this.khiDoiThoiDiem);
+      [this.bangHuongDan, this.bangThongSo, this.chipCheDo, this.bangDiemDung, this.nutThoiDiem].forEach(function (el) { el.remove(); });
+    },
+
+    // Tô sáng nút của thời điểm đang chọn
+    danhDauThoiDiem: function (e) {
+      Array.prototype.forEach.call(this.nutThoiDiem.children, function (nut) {
+        nut.classList.toggle('dang-chon', nut.dataset.ten === e.detail.ten);
+      });
     },
 
     dangTrenThuyen: function () {

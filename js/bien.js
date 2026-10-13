@@ -168,6 +168,8 @@
     'uniform vec4 uThuyen;               // x, z, góc hướng, tốc độ (0..1)',
     'uniform sampler2D uBanDoGon;',
     'uniform vec4 uDaoGan[SO_DAO_PC];    // các đảo gần: x, z, bán kính, chiều cao',
+    'uniform vec4 uDenLong[8];           // đèn lồng gần: x, y, z, độ sáng (0 = ô trống)',
+    'uniform float uDem;',
     'varying vec3 vViTri;',
     '',
     'vec3 layGon(vec2 uv) { return texture2D(uBanDoGon, uv).xyz * 2.0 - 1.0; }',
@@ -293,6 +295,22 @@
     '',
     '  vec3 mau = mix(thanNuoc, phanChieu, fresnel) + uMauNang * lapLanh;',
     '',
+    '  // 5b) Ban đêm: ánh đèn lồng phản chiếu thành vệt lung linh trên mặt nước.',
+    '  //     Giống vệt nắng: tia phản xạ R càng trùng hướng tới đèn càng sáng; sóng làm',
+    '  //     R dao động nên vệt sáng bị kéo dài, lăn tăn. Ban ngày bỏ qua cả vòng lặp.',
+    '  if (uDem > 0.01) {',
+    '    float anhDen = 0.0;',
+    '    for (int i = 0; i < 8; i++) {',
+    '      vec4 den = uDenLong[i];',
+    '      if (den.w <= 0.0) break;',
+    '      vec3 toiDen = den.xyz - vViTri;',
+    '      float kcDen = length(toiDen);',
+    '      float trungDen = max(dot(R, toiDen / kcDen), 0.0);',
+    '      anhDen += (pow(trungDen, 600.0) * 4.0 + pow(trungDen, 60.0) * 0.35) * den.w / (1.0 + kcDen * 0.03);',
+    '    }',
+    '    mau += vec3(1.0, 0.6, 0.25) * anhDen * uDem;',
+    '  }',
+    '',
     '  // 6) Bọt sóng của thuyền: trắng, nhận ánh sáng trời + nắng',
     '  float bot = botThuyen(vViTri.xz, dFdx(vViTri.xz), dFdy(vViTri.xz));',
     '  mau = mix(mau, uMauGiuaTroi * 0.9 + uMauNang * 0.35, bot * 0.85);',
@@ -324,11 +342,18 @@
       // Danh sách đảo gần (cập nhật vài lần mỗi giây trong tick)
       this.daoGan = [];
       for (var i = 0; i < SO_DAO_PHAN_CHIEU; i++) this.daoGan.push(new THREE.Vector4());
+      // 8 đèn lồng gần người xem nhất (ban đêm)
+      this.denGan = [];
+      for (i = 0; i < 8; i++) this.denGan.push(new THREE.Vector4());
+      this.dsDenTam = [];
+      var cam = this.viTriCam = new THREE.Vector3();
+      this.soSanhDen = function (a, b) { return a.distanceToSquared(cam) - b.distanceToSquared(cam); };
 
       // uniform riêng + uniform chung (màu trời, mặt trời, thời gian, thuyền...)
       var uniforms = Object.assign({
         uBanDoGon: { value: taoBanDoGon(256) },
-        uDaoGan: { value: this.daoGan }
+        uDaoGan: { value: this.daoGan },
+        uDenLong: { value: this.denGan }
       }, HALONG.uniformChung);
 
       var vatLieu = new THREE.ShaderMaterial({
@@ -342,7 +367,6 @@
       this.mat = new THREE.Mesh(hinh, vatLieu);
       this.mat.frustumCulled = false;          // lưới luôn bao quanh người xem
       this.el.setObject3D('mesh', this.mat);
-      this.viTriCam = new THREE.Vector3();
       this.demKhung = 0;
       this.sapXep = [];                        // mảng tạm để sắp xếp đảo (tái sử dụng, đỡ rác bộ nhớ)
       this.huongNhin = new THREE.Vector3();
@@ -357,6 +381,27 @@
 
       // Cứ 4 khung hình chọn lại các đảo để tính bóng phản chiếu (rất nhẹ, ~vài micro giây)
       if (this.demKhung++ % 4 === 0) this.chonDaoGan();
+      // Đèn trên thuyền di chuyển liên tục → chọn đèn gần mỗi khung hình (chỉ khi trời tối)
+      this.chonDenGan();
+    },
+
+    chonDenGan: function () {
+      var den = this.denGan, i;
+      if (HALONG.uniformChung.uDem.value < 0.01) {
+        if (den[0].w !== 0) for (i = 0; i < den.length; i++) den[i].set(0, 0, 0, 0);
+        return;
+      }
+      var ds = this.dsDenTam;
+      ds.length = 0;
+      var thuyen = HALONG.thuyen && HALONG.thuyen.denLongTheGioi;
+      if (thuyen) for (i = 0; i < thuyen.length; i++) ds.push(thuyen[i]);
+      var tinh = HALONG.denLongTinh || [];
+      for (i = 0; i < tinh.length; i++) ds.push(tinh[i]);
+      ds.sort(this.soSanhDen);
+      for (i = 0; i < den.length; i++) {
+        if (i < ds.length) den[i].set(ds[i].x, ds[i].y, ds[i].z, 1);
+        else den[i].set(0, 0, 0, 0);
+      }
     },
 
     // Chọn tối đa 12 đảo "to nhất trong mắt người xem": điểm = kích thước / khoảng cách.

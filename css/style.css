@@ -3,6 +3,7 @@
  * -------------------------------------------------------------------------
  * Mốc 1: bảng hướng dẫn phím + bảng thông số hiệu năng.
  * Mốc 2: chip chế độ (Du thuyền / Tự do) + bảng điểm dừng.
+ * Mốc 3: 3 nút Ngày / Hoàng hôn / Đêm.
  * Mốc 4 sẽ thêm: màn hình chờ, menu, minimap, bảng thuyết minh.
  * Chỉ dùng font có sẵn trong máy (không tải font ngoài → chạy offline).
  * ========================================================================= */
@@ -147,6 +148,34 @@ kbd {
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* 3 nút Ngày / Hoàng hôn / Đêm – góc phải trên. Riêng khung này nhận chuột. */
+#nut-thoi-diem {
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+#nut-thoi-diem button {
+  padding: 6px 12px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--chu);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+#nut-thoi-diem button:hover { background: rgba(255, 190, 130, 0.18); }
+#nut-thoi-diem button.dang-chon {
+  color: #2a1d3d;
+  background: var(--nhan);
 }
 
 /* Màn hình hẹp (điện thoại): thu nhỏ bảng hướng dẫn */
