@@ -110,6 +110,10 @@
     return hinh;
   }
 
+  // Đánh dấu hình HỞ (mái, đầu hồi, tấm hiên, vỏ thuyền) cần vẽ 2 mặt. Hình khối kín (tường,
+  // sàn, phao, cột, ván) chỉ vẽ mặt trước → GPU không tô thừa mặt sau bị che (≈ +50% điểm ảnh khi ở gần)
+  function haiMat(hinh) { hinh.userData.haiMat = true; return hinh; }
+
   // Hộp có UV theo atlas: mặt trước (+Z) dùng vùng 'truoc', các mặt khác dùng 'ben'.
   // Thứ tự mặt của BoxGeometry: +X, -X, +Y, -Y, +Z, -Z (mỗi mặt 4 đỉnh).
   function hopAtlas(w, h, d, truoc, ben, tren) {
@@ -136,7 +140,7 @@
     hinh.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     hinh.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
     hinh.computeVertexNormals();
-    return datVung(hinh, VUNG.C);
+    return haiMat(datVung(hinh, VUNG.C));
   }
 
   // Tam giác đầu hồi (bịt 2 đầu mái)
@@ -147,7 +151,7 @@
     hinh.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
     hinh.setIndex([0, 1, 2]);
     hinh.computeVertexNormals();
-    return datVung(hinh, VUNG.B);
+    return haiMat(datVung(hinh, VUNG.B));
   }
 
   // Bát (nửa quả cầu dưới) + đáy trong: dùng cho thuyền nan / thuyền thúng
@@ -159,7 +163,7 @@
     day.rotateX(-Math.PI / 2);
     day.scale(sx * 0.82, 1, sz * 0.82);
     day.translate(0, -sy * 0.55, 0);
-    return [H.toMau(datVung(vo, VUNG.D), mau), H.toMau(datVung(day, VUNG.D), '#2a1d12')];
+    return [haiMat(H.toMau(datVung(vo, VUNG.D), mau)), H.toMau(datVung(day, VUNG.D), '#2a1d12')];
   }
 
   /* ---------- 1 căn nhà bè (toạ độ riêng: mặt tiền hướng +Z) ---------- */
@@ -192,7 +196,7 @@
     var zHienTrong = zNha + d / 2, zHienNgoai = D / 2 - 0.15;
     var hien = new THREE.PlaneGeometry(w + 0.6, zHienNgoai - zHienTrong + 0.2);
     hien.rotateX(-Math.PI / 2 + 0.28);
-    ds.push(H.toMau(datVung(hien, VUNG.C).translate(0, yMai - 0.3, (zHienTrong + zHienNgoai) / 2), mauMai));
+    ds.push(haiMat(H.toMau(datVung(hien, VUNG.C).translate(0, yMai - 0.3, (zHienTrong + zHienNgoai) / 2), mauMai)));
     [-1, 1].forEach(function (ben) {
       ds.push(H.toMau(datVung(new THREE.BoxGeometry(0.12, 2.2, 0.12), VUNG.D)
         .translate(ben * (w / 2 + 0.1), sanY + 1.1, zHienNgoai - 0.1), '#6a4a30'));
@@ -257,7 +261,8 @@
           MAU_PHAO[i % 2], ketQua);
         var lech = (rand() - 0.5) * 0.12;   // nhà bè không thẳng hàng tuyệt đối
         var p = datVaoLang(ketQua.hinh, ketQua.denLong, n.u, n.v, lech);
-        vatCan.push({ x: p.x, z: p.z, r: Math.max(kt.rong, kt.sau) / 2 + 0.5, cao: 5 * n.to });
+        // nhà nhỏ, sát nhau → lề va chạm riêng 0,6 m (đảo dùng 3 m) để còn bay được giữa các dãy nhà
+        vatCan.push({ x: p.x, z: p.z, r: Math.max(kt.rong, kt.sau) / 2 + 0.5, cao: 5 * n.to, le: 0.6 });
       });
 
       // ---- Lối đi ván nối các nhà (dọc mỗi dãy) và nối 2 dãy ----
@@ -313,14 +318,18 @@
       });
 
       // ---- Vật liệu ----
-      // DoubleSide: nhìn từ dưới lên vẫn thấy mặt dưới mái hiên / mái nhà (không bị "thủng")
-      var vlLang = HALONG.vaShader(new THREE.MeshLambertMaterial({ map: taoAtlas(false), vertexColors: true, side: THREE.DoubleSide }), {
-        ten: 'lang-chai',
-        uniforms: { uMatNa: { value: taoAtlas(true) } },
-        manhKhaiBao: 'uniform sampler2D uMatNa;\nuniform float uDem;',
-        // ban đêm cửa sổ / khe cửa sáng đèn
-        manhTruocSuong: 'gl_FragColor.rgb += texture2D(uMatNa, vMapUv).rgb * uDem * 1.8;'
-      });
+      // 2 vật liệu cùng atlas: khối kín vẽ 1 mặt; mái / hiên / vỏ thuyền vẽ 2 mặt để nhìn từ
+      // dưới lên vẫn thấy mặt dưới mái (không bị "thủng"). Thêm 1 draw call nhưng đỡ tô thừa nhiều.
+      var atlas = taoAtlas(false), matNa = { value: taoAtlas(true) };
+      function taoVlLang(ten, side) {
+        return HALONG.vaShader(new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, side: side }), {
+          ten: ten,
+          uniforms: { uMatNa: matNa },
+          manhKhaiBao: 'uniform sampler2D uMatNa;\nuniform float uDem;',
+          // ban đêm cửa sổ / khe cửa sáng đèn
+          manhTruocSuong: 'gl_FragColor.rgb += texture2D(uMatNa, vMapUv).rgb * uDem * 1.8;'
+        });
+      }
       var texLuoi = HALONG.taoTextureCanvas(128, 128, function (ctx, w, h) {
         ctx.clearRect(0, 0, w, h);
         ctx.strokeStyle = 'rgba(60,70,50,1)';
@@ -345,7 +354,8 @@
       });
 
       var nhom = new THREE.Group();
-      nhom.add(new THREE.Mesh(H.gop(tatCa), vlLang));
+      nhom.add(new THREE.Mesh(H.gop(tatCa.filter(function (h) { return !h.userData.haiMat; })), taoVlLang('lang-chai', THREE.FrontSide)));
+      nhom.add(new THREE.Mesh(H.gop(tatCa.filter(function (h) { return h.userData.haiMat; })), taoVlLang('lang-chai-2mat', THREE.DoubleSide)));
       nhom.add(new THREE.Mesh(H.gop(luoi), vlLuoi));
       nhom.add(new THREE.Mesh(H.gop(hinhDen), HALONG.vatLieuDenLong()));
       nhom.add(HALONG.taoDiemSang({ viTri: diemQuang, mau: '#ffb04a', kichThuoc: 1.6, sangNgay: 0.1, hatGiong: 21 }));

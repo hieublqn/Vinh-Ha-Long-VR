@@ -357,7 +357,7 @@
         dao = dungDao(KIEU_NOI_BAT['bo-hon'], hat, noise, vt.x, vt.z, 38, 1.4, 1.05, 0.85, gocToiDiemDung + 1.2);
         // Khoét cửa Hang Sửng Sốt vào vách quay về phía điểm dừng (hang-dong.js)
         if (HALONG.HangDong) {
-          HALONG.HangDong.khoet(dao.hinh, { x: vt.x, z: vt.z, goc: gocToiDiemDung });
+          HALONG.HangDong.khoet(dao.hinh, { x: vt.x, z: vt.z, goc: gocToiDiemDung, elip: dao });
           hinhHaiMat.push(dao.hinh);
         } else {
           hinhGop.push(dao.hinh);

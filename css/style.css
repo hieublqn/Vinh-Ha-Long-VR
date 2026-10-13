@@ -69,6 +69,12 @@ html, body {
   font-size: 14px;
   line-height: 1.9;
 }
+#bang-huong-dan .ghi-chu {
+  margin: -4px 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--chu-phu);
+}
 kbd {
   display: inline-block;
   min-width: 18px;
@@ -149,6 +155,13 @@ kbd {
   font-size: 14px;
   line-height: 1.5;
 }
+#bang-diem-dung .huong-nhin {
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--nhan);
+}
+#bang-diem-dung .huong-nhin[hidden] { display: none; }
 
 /* 3 nút Ngày / Hoàng hôn / Đêm – góc phải trên. Riêng khung này nhận chuột. */
 #nut-thoi-diem {
@@ -178,14 +191,29 @@ kbd {
   background: var(--nhan);
 }
 
-/* Màn hình hẹp (điện thoại): thu nhỏ bảng hướng dẫn */
+/* Màn cảm ứng: không có phím M nên bỏ gợi ý phím trong chip */
+@media (pointer: coarse) {
+  #chip-che-do .goi-y { display: none; }
+}
+
+/* Màn vừa (cửa sổ chia đôi màn laptop, máy tính bảng, điện thoại xoay ngang):
+   giữa phía trên không đủ chỗ cho chip + bảng điểm dừng bên cạnh bảng hướng dẫn và
+   nút thời điểm → đưa chip và bảng điểm dừng xuống dưới */
+@media (max-width: 1099px) {
+  #chip-che-do { top: auto; bottom: 64px; }
+  #bang-diem-dung { top: auto; bottom: 110px; }
+}
+
+/* Màn hẹp (điện thoại dọc): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm */
 @media (max-width: 600px) {
   #bang-huong-dan {
+    top: 64px;
     max-width: 200px;
     padding: 10px 12px;
   }
   #bang-huong-dan ul { font-size: 12px; line-height: 1.7; }
-  #chip-che-do { top: auto; bottom: 64px; font-size: 12px; }
+  #chip-che-do { font-size: 12px; }
   #chip-che-do .goi-y { display: none; }
-  #bang-diem-dung { top: auto; bottom: 110px; }
+  /* chừa chỗ cho nút kính VR của A-Frame ở góc phải dưới */
+  #bang-thong-so { max-width: calc(100vw - 140px); font-size: 11px; }
 }

@@ -155,7 +155,9 @@
     uDem:          { value: 0 },                          // 0 = ban ngày/hoàng hôn, 1 = đêm hẳn
     uMauMay:       { value: new THREE.Color() },          // màu nền của mây
     uMauDia:       { value: new THREE.Color() },          // màu đĩa mặt trời / mặt trăng (HDR)
-    uKichThuocDia: { value: 0.99986 }                     // cos(bán kính góc của đĩa): càng gần 1 đĩa càng nhỏ
+    uKichThuocDia: { value: 0.99986 },                    // cos(bán kính góc của đĩa): càng gần 1 đĩa càng nhỏ
+    uDenBoongViTri: { value: new THREE.Vector3() },       // đèn boong thuyền (vị trí thế giới)
+    uDenBoongMau:  { value: new THREE.Color(0, 0, 0) }    // màu × cường độ (0 ban ngày)
   };
 
   /* -----------------------------------------------------------------------
@@ -299,6 +301,27 @@
     return vatLieu;
   };
 
+  /* ĐÈN BOONG tự tính trong shader, chỉ cho các vật liệu của thuyền.
+   * Nếu dùng THREE.PointLight thật thì MỌI vật liệu Lambert trong cảnh (đảo, làng chài, hang...)
+   * đều phải tính thêm 1 đèn ở mỗi điểm ảnh, cả ban ngày (cường độ 0), dù đèn chỉ soi tới
+   * thuyền (tầm 24 m, đảo luôn cách lộ trình ≥ 24 m). Công thức giống hệt PointLight của
+   * three.js (decay 2, cắt mềm ở 24 m, BRDF Lambert = màu / π) nên nhìn không đổi. */
+  HALONG.glsl.denBoong = [
+    'uniform vec3 uDenBoongViTri;',
+    'uniform vec3 uDenBoongMau;',
+    '// xuyen: phần ánh sáng xuyên qua mặt sau (vải buồm mỏng: đèn phía sau vẫn làm buồm ửng sáng)',
+    'vec3 anhDenBoong(vec3 mauGoc, float xuyen) {',
+    '  vec3 L = uDenBoongViTri - vViTriTheGioi;',
+    '  float d2 = max(dot(L, L), 0.01);',
+    '  if (d2 > 576.0) return vec3(0.0);                   // ngoài 24 m',
+    '  float cuaSo = 1.0 - d2 * d2 / 331776.0;              // 1 - (d/24)^4: tắt mềm ở rìa',
+    '  vec3 nD = normalize(vPhapTuyenTG) * (gl_FrontFacing ? 1.0 : -1.0);',
+    '  float cosL = dot(nD, L * inversesqrt(d2));',
+    '  float ndl = max(cosL, 0.0) + xuyen * max(-cosL, 0.0);',
+    '  return mauGoc * 0.31830989 * uDenBoongMau * ndl * cuaSo * cuaSo / d2;',
+    '}'
+  ].join('\n');
+
   // Trường hợp đơn giản nhất: chỉ gắn sương mù theo hướng
   HALONG.apDungSuongMu = function (vatLieu) {
     return HALONG.vaShader(vatLieu, { ten: 'suong-mu' });
@@ -408,12 +431,14 @@
     });
     var diem = new THREE.Points(hinh, vatLieu);
     diem.frustumCulled = false;
-    // Mỗi lần vẽ: tính tỉ lệ đổi "mét" → "pixel" theo chiều cao màn hình và góc nhìn camera
+    // Mỗi lần vẽ: tính tỉ lệ đổi "mét" → "pixel" theo chiều cao màn hình và góc nhìn camera.
+    // Lấy từ MA TRẬN CHIẾU (phần tử [5] = 1 / tan(nửa góc nhìn dọc)) chứ không lấy camera.fov:
+    // trong kính VR, camera của từng mắt giữ fov mặc định 50° dù ma trận chiếu là của kính
+    // (~90–100°) → dùng fov sẽ vẽ đốm sáng to gấp ~2,4 lần
     var kt = new THREE.Vector2();
     diem.onBeforeRender = function (renderer, scene, camera) {
       renderer.getDrawingBufferSize(kt);
-      var fov = camera.isPerspectiveCamera ? camera.fov : 80;
-      uniforms.uTiLeDiem.value = kt.y / (2 * Math.tan(THREE.MathUtils.degToRad(fov) / 2));
+      uniforms.uTiLeDiem.value = kt.y * 0.5 * camera.projectionMatrix.elements[5];
     };
     return diem;
   };
@@ -497,6 +522,19 @@
       ds.forEach(function (h) { h.dispose(); });
       return ketQua;
     }
+  };
+
+  // Phím bấm khi đang gõ chữ (ô nhập của A-Frame Inspector Ctrl+Alt+I...) thì không phải lệnh điều khiển
+  HALONG.dangGoChu = function (e) {
+    var el = e.target;
+    if (!el) return false;
+    var tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!el.isContentEditable;
+  };
+  // Phím tắt 1 chữ (H, N, 1 2 3...): bỏ qua khi đang gõ chữ hoặc đang giữ Ctrl/Alt/Cmd
+  // (Ctrl+H là lịch sử của Chrome, không phải lệnh ẩn bảng hướng dẫn)
+  HALONG.boQuaPhimTat = function (e) {
+    return e.ctrlKey || e.altKey || e.metaKey || HALONG.dangGoChu(e);
   };
 
   // Lấy vị trí camera trong thế giới (dùng ở nhiều component)

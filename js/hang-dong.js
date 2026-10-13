@@ -30,7 +30,8 @@
 
   HALONG.HangDong = {
     /* Khoét cửa hang vào hình đảo (toạ độ thế giới).
-     * tt = { x, z: tâm đảo, goc: hướng (radian, atan2(dz, dx)) từ tâm đảo ra điểm dừng } */
+     * tt = { x, z: tâm đảo, goc: hướng (radian, atan2(dz, dx)) từ tâm đảo ra điểm dừng,
+     *        elip: { x, z, rX, rZ, xoay } elip va chạm của đảo (để nối vùng bay hang ra ngoài elip) } */
     khoet: function (hinh, tt) {
       var pos = hinh.attributes.position;
       var nx = Math.cos(tt.goc), nz = Math.sin(tt.goc);
@@ -88,26 +89,62 @@
       var nVao = n.clone().negate();                               // hướng đi sâu vào trong
       var Cc = S.clone().addScaledVector(nVao, HAM.sau);
       Cc.y = 7;
-      HALONG.hangDong = taoThongTinHang(S, n, A, Cc);
+      HALONG.hangDong = taoThongTinHang(S, n, A, Cc, tt.elip);
       return HALONG.hangDong;
     }
   };
 
-  /* ---------- Vùng bay được trong hang: đường hầm (hình viên thuốc) + khoang (elip) ---------- */
-  function taoThongTinHang(S, n, A, Cc) {
+  /* ---------- Vùng bay được trong hang: PHỄU trước cửa + đường hầm + khoang (elip) ----------
+   * Đảo Bồ Hòn có elip va chạm (cộng lề 3 m) nhô ra ~8 m trước vách. Nếu vùng hầm chỉ thò ra
+   * ngoài vài mét thì: (1) gặp "tường vô hình" 8 m trước cửa hang, (2) lúc bay ra, vừa rời
+   * vùng hầm là bị elip của đảo đẩy văng ra mép elip trong 1 khung hình.
+   * → Vùng bay kéo dài thành cái PHỄU vượt ra NGOÀI elip va chạm: miệng phễu rộng ở ngoài
+   *   biển, thu dần về bán kính hầm ở chân vách. Chỉ coi là "đã ra khỏi hang" khi đã ra
+   *   ngoài elip va chạm → không bao giờ bị đẩy giật. */
+  var LE_RA = 3.5;              // > lề va chạm đảo (3 m) của dieu-khien → ra khỏi phễu là ngoài elip
+  var R_MIENG_PHEU = 5;         // bán kính miệng phễu ngoài biển (m)
+
+  function taoThongTinHang(S, n, A, Cc, elip) {
     var nVao = n.clone().negate();
-    var dauNgoai = S.clone().addScaledVector(n, 10);   // đầu ngoài hầm: thò ra khỏi vách 10 m để bay vào được
+    // Elip va chạm của đảo (cùng quy ước xoay với dieu-khien.js), nới thêm LE_RA
+    var cs = 0, sn = 0, ax = 0, az = 0;
+    if (elip) {
+      cs = Math.cos(elip.xoay || 0); sn = Math.sin(elip.xoay || 0);
+      ax = elip.rX + LE_RA; az = elip.rZ + LE_RA;
+    }
+    function heElip(x, z) {                      // toạ độ chuẩn hoá: < 1 là còn trong elip
+      var dx = x - elip.x, dz = z - elip.z;
+      return Math.hypot((dx * cs - dz * sn) / ax, (dx * sn + dz * cs) / az);
+    }
+    // Từ S đi ra theo n bao xa thì ra khỏi elip: giải phương trình bậc 2 theo t
+    var dai = 10;
+    if (elip) {
+      var lx0 = (S.x - elip.x) * cs - (S.z - elip.z) * sn, lz0 = (S.x - elip.x) * sn + (S.z - elip.z) * cs;
+      var ux = n.x * cs - n.z * sn, uz = n.x * sn + n.z * cs;
+      var qa = ux * ux / (ax * ax) + uz * uz / (az * az);
+      var qb = 2 * (lx0 * ux / (ax * ax) + lz0 * uz / (az * az));
+      var qc = lx0 * lx0 / (ax * ax) + lz0 * lz0 / (az * az) - 1;
+      var delta = qb * qb - 4 * qa * qc;
+      if (delta > 0) dai = Math.max((-qb + Math.sqrt(delta)) / (2 * qa), 0) + 3;   // thò thêm 3 m ra ngoài elip
+    }
+    var dauNgoai = S.clone().addScaledVector(n, dai);   // miệng phễu (ngoài biển)
     dauNgoai.y = 4.6;
     var dauTrong = Cc.clone(); dauTrong.y = 5;
-    var rHam = BAN_KINH_HAM - 1.2;                     // chừa lề để đầu không chạm vách
+    var rHam = BAN_KINH_HAM - 1.2;                     // chừa lề để đầu không chạm vách hầm
     var e = { rx: HAM.rx - 1.6, ry: HAM.ry - 1.6, rz: HAM.rz - 1.6 };
     var tam = new THREE.Vector3(), d = new THREE.Vector3();
 
+    function truocVach(p) { return (p.x - S.x) * n.x + (p.z - S.z) * n.z; }   // > 0: ở ngoài vách
     // Điểm gần nhất trên đoạn thẳng trục hầm
     function chieuLenTruc(p, ketQua) {
       d.subVectors(dauTrong, dauNgoai);
       var t = THREE.MathUtils.clamp(tam.subVectors(p, dauNgoai).dot(d) / d.lengthSq(), 0, 1);
       return ketQua.copy(dauNgoai).addScaledVector(d, t);
+    }
+    // Bán kính vùng bay tại 1 điểm trên trục: trong vách = bán kính hầm, ngoài vách nở dần ra miệng phễu
+    function banKinhTai(diemTruc) {
+      var ra = truocVach(diemTruc);
+      return ra <= 0 ? rHam : rHam + (R_MIENG_PHEU - rHam) * Math.min(ra / dai, 1);
     }
     // Toạ độ của p trong hệ trục khoang (đơn vị: bán trục) → |q| < 1 là ở trong khoang
     function heKhoang(p) {
@@ -118,23 +155,31 @@
 
     return {
       S: S, n: n, A: A, nVao: nVao, Cc: Cc, sanY: SAN_Y,
+      daiPheu: dai,
       // chỗ đứng khi "vào hang" (Mốc 4 dùng cho nút dịch chuyển vào hang)
       viTriTrong: Cc.clone().addScaledVector(n, 6).setY(SAN_Y),
       trong: function (p) {
-        if (p.distanceTo(chieuLenTruc(p, truc)) < rHam) return true;
+        if (p.distanceTo(chieuLenTruc(p, truc)) < banKinhTai(truc)) return true;
         var k = heKhoang(p);
         return k.a * k.a + k.b * k.b + k.c * k.c < 1;
       },
-      // Ra ngoài bằng cửa hang (đã ở phía ngoài vách)?
+      // Đã ra khỏi hang qua cửa? = đã ra ngoài elip va chạm của đảo (nên không bị đảo đẩy giật)
       raNgoaiCua: function (p) {
-        return (p.x - S.x) * n.x + (p.z - S.z) * n.z > 1;
+        return elip ? heElip(p.x, p.z) >= 1 : truocVach(p) > 1;
+      },
+      // Đầu thấp nhất được phép: trong hầm/khoang cao hơn sàn hang 1,5 m; ngoài phễu (trên
+      // mặt nước) hạ dần về 1,6 m trong 6 m → không bị nhấc giật lên khi vừa vào phễu
+      doCaoDauToiThieu: function (p) {
+        var k = THREE.MathUtils.clamp(truocVach(p) / 6, 0, 1);
+        return SAN_Y + 1.5 + (1.6 - SAN_Y - 1.5) * k;
       },
       // Kéo p về điểm gần nhất còn nằm trong hang (hầm hoặc khoang)
       kep: function (p) {
         chieuLenTruc(p, truc);
+        var rCho = banKinhTai(truc) * 0.98;            // lùi vào trong một chút → bước sau vẫn tính là "trong"
         var ungVien1 = p.clone().sub(truc);
-        var dai = ungVien1.length();
-        ungVien1 = dai > rHam ? truc.clone().addScaledVector(ungVien1, rHam / dai) : p.clone();
+        var cachTruc = ungVien1.length();
+        ungVien1 = cachTruc > rCho ? truc.clone().addScaledVector(ungVien1, rCho / cachTruc) : p.clone();
         var k = heKhoang(p), q = Math.sqrt(k.a * k.a + k.b * k.b + k.c * k.c);
         var ungVien2 = p.clone();
         if (q > 1) {
@@ -222,6 +267,10 @@
       // mũ 0.85 < 1: thân hơi phình như củ cà rốt → nhìn ra khối nón, không dẹt như mảnh kính
       diem.push(new THREE.Vector2(Math.max(0.5 * Math.pow(1 - t, 0.85), 0.004), -t));
     }
+    // LatheGeometry chỉ cho mặt + pháp tuyến hướng RA NGOÀI khi đường viền đi theo y TĂNG dần;
+    // viền trên đi từ gốc (y = 0) xuống ngọn (y = -1) nên phải đảo lại, nếu không nhũ đá bị
+    // "lộn trong ra ngoài": nửa gần bị bỏ (FrontSide), thấy mặt trong nửa xa, ánh sáng ngược phía
+    diem.reverse();
     var hinh = new THREE.LatheGeometry(diem, 8);
     var pos = hinh.attributes.position, mau = [], dau = [];
     var GOC = new THREE.Color('#8a7d66'), NGON = new THREE.Color('#cbbfa4'), c = new THREE.Color();

@@ -23,8 +23,9 @@ Dòng đó chỉ cảnh báo chung về việc tải ảnh/mô hình. Dự án n
   (khoảng 0,9 km), dừng ở 5 điểm: Vịnh Hạ Long → Đảo Ti Tốp → Hang Sửng Sốt → Làng chài Cửa Vạn →
   Hòn Gà Chọi. Mỗi điểm dừng hiện bảng giới thiệu ngắn.
 - **Tự do**: rời thuyền, bay trên mặt nước để khám phá; không đi xuyên đảo.
-  Riêng đảo Bồ Hòn có **cửa hang Sửng Sốt** quay về phía điểm dừng: bay thẳng vào cửa vòm (độ cao
-  khoảng 3–8 m) để đi qua đường hầm vào khoang hang có nhũ đá và đèn màu.
+  Riêng đảo Bồ Hòn có **cửa hang Sửng Sốt** quay về phía điểm dừng: bay về phía giữa cửa vòm
+  (từ ngoài biển có một "phễu" rộng ~10 m dẫn vào, càng gần vách càng thu hẹp về lòng hầm) để đi qua
+  đường hầm vào khoang hang có nhũ đá và đèn màu. Muốn ra thì bay ngược ra cửa.
 
 ## Thời điểm trong ngày
 
@@ -52,6 +53,11 @@ Góc dưới bên trái là bảng **FPS · Draw call · Tam giác** để tự 
 (chữ chuyển đỏ khi FPS dưới 45).
 
 Ghi chú:
+- **Tắt bộ gõ tiếng Việt** (Unikey / EVKey: bấm `Ctrl+Shift` hoặc chuyển sang chế độ E) khi điều khiển:
+  ở kiểu gõ Telex, phím `W` bị bộ gõ biến thành chữ "ư" nên trình duyệt không nhận được phím đi tới
+  (dùng phím mũi tên `↑` thay thế cũng được).
+- Đang neo ở điểm dừng mà cảnh được giới thiệu nằm ngoài khung nhìn thì bảng điểm dừng hiện gợi ý
+  "◀ Nhìn sang trái" / "Nhìn sang phải ▶" (hoặc "Ở phía sau, bên trái / phải").
 - Phím `F` (mặc định của A-Frame để vào VR) đã được tắt: trên máy không có kính, nó chỉ làm
   khung 3D toàn màn hình và che mất các bảng thông tin.
 - Nút kính VR ở góc phải chỉ hiện khi trình duyệt hỗ trợ WebXR "immersive-vr" (có kính VR).

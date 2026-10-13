@@ -25,7 +25,10 @@
    * vertex shader dùng nó để uốn cánh khi vỗ (đầu cánh vung nhiều nhất). */
   function taoHinhHaiAu() {
     var viTri = [], mau = [], canh = [];
-    var TRANG = [0.93, 0.93, 0.9], XAM = [0.66, 0.68, 0.71], DEN = [0.12, 0.12, 0.12];
+    // Màu viết theo sRGB như mọi file khác (#hex) rồi đổi sang tuyến tính: scene bật colorManagement,
+    // shader coi vertex color là tuyến tính → để số thô thì cánh xám gần như trắng, đầu cánh "đen" thành xám
+    function mauRgb(hex) { var c = new THREE.Color(hex); return [c.r, c.g, c.b]; }
+    var TRANG = mauRgb('#eeeee6'), XAM = mauRgb('#a8adb5'), DEN = mauRgb('#1f1f1f');
     function tamGiac(a, b, c, m, ka, kb, kc) {
       viTri.push.apply(viTri, a.concat(b, c));
       mau.push.apply(mau, m.concat(m, m));
@@ -78,7 +81,9 @@
       });
       this.luoi = new THREE.InstancedMesh(hinh, vatLieu, n);
       this.luoi.frustumCulled = false;
-      this.el.setObject3D('mesh', this.luoi);
+      // Khóa riêng 'hai-au' (không phải 'mesh'): cùng entity còn có component dom-dom,
+      // setObject3D cùng khóa sẽ GỠ vật thể của component kia ra khỏi cảnh
+      this.el.setObject3D('hai-au', this.luoi);
 
       // Trạng thái từng con: vị trí, vận tốc, mức vỗ cánh
       this.chim = [];
@@ -185,7 +190,7 @@
     },
 
     remove: function () {
-      this.el.removeObject3D('mesh');
+      this.el.removeObject3D('hai-au');
     }
   });
 
@@ -194,24 +199,32 @@
     init: function () {
       var rand = HALONG.taoRandom(1212);
       var viTri = [], mau = [], c = new THREE.Color(), c1 = new THREE.Color('#c8ff6a'), c2 = new THREE.Color('#fff38a');
-      function themQuanh(x, z, rTrong, rNgoai, soLuong, caoMax) {
+      // Rải đom đóm trên vành elip quanh (x, z): bán trục rX, rZ, xoay 'xoay' – cùng quy ước
+      // với elip va chạm của đảo (dieu-khien.js) → bám sát chân đảo dẹt như Bồ Hòn,
+      // không lơ lửng giữa biển ở phía cạnh ngắn
+      function themQuanh(x, z, rX, rZ, xoay, lechTrong, lechNgoai, soLuong, caoMax) {
+        var cs = Math.cos(xoay), sn = Math.sin(xoay);
         for (var i = 0; i < soLuong; i++) {
-          var g = rand() * Math.PI * 2, r = rand.khoang(rTrong, rNgoai);
-          viTri.push(x + Math.cos(g) * r, rand.khoang(0.6, caoMax), z + Math.sin(g) * r);
+          var g = rand() * Math.PI * 2, lech = rand.khoang(lechTrong, lechNgoai);
+          var lx = Math.cos(g) * (rX + lech), lz = Math.sin(g) * (rZ + lech);
+          viTri.push(x + lx * cs + lz * sn, rand.khoang(0.6, caoMax), z - lx * sn + lz * cs);
           c.copy(c1).lerp(c2, rand());
           mau.push(c.r, c.g, c.b);
         }
       }
+      function themQuanhDao(d, lechTrong, lechNgoai, soLuong, caoMax) {
+        themQuanh(d.x, d.z, d.rX || d.rChan, d.rZ || d.rChan, d.xoay || 0, lechTrong, lechNgoai, soLuong, caoMax);
+      }
       var self = this;
       function dung() {
         // Quanh chân các đảo nổi bật (có cây) và làng chài
-        (HALONG.dsDao || []).slice(0, 4).forEach(function (d) { themQuanh(d.x, d.z, d.rChan + 1, d.rChan + 12, 45, 9); });
-        if (HALONG.langChai) themQuanh(HALONG.langChai.x, HALONG.langChai.z, 5, 48, 90, 5);
+        (HALONG.dsDao || []).slice(0, 4).forEach(function (d) { themQuanhDao(d, 1, 12, 45, 9); });
+        if (HALONG.langChai) themQuanh(HALONG.langChai.x, HALONG.langChai.z, 0, 0, 0, 5, 48, 90, 5);
         // Vài đảo nhỏ gần lộ trình
         (HALONG.dsDao || []).slice(4).filter(function (d) {
           return HALONG.LO_TRINH.khoangCachToi(d.x, d.z) - d.rChan < 50;
-        }).slice(0, 6).forEach(function (d) { themQuanh(d.x, d.z, d.rChan + 1, d.rChan + 8, 14, 7); });
-        self.el.setObject3D('mesh', HALONG.taoDiemSang({
+        }).slice(0, 6).forEach(function (d) { themQuanhDao(d, 1, 8, 14, 7); });
+        self.el.setObject3D('dom-dom', HALONG.taoDiemSang({
           viTri: viTri, mau: mau, kichThuoc: 0.3, nhapNhay: 1, troi: 1.4, sangNgay: 0, hatGiong: 31
         }));
       }
@@ -221,7 +234,8 @@
     },
 
     remove: function () {
-      this.el.removeObject3D('mesh');
+      // gỡ trước khi scene 'loaded' thì chưa có đom đóm để gỡ
+      if (this.el.getObject3D('dom-dom')) this.el.removeObject3D('dom-dom');
     }
   });
 })();

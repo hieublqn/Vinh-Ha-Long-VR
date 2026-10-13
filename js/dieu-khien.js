@@ -77,10 +77,9 @@
     },
 
     khiNhanPhim: function (e) {
-      var tag = e.target && e.target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (HALONG.dangGoChu(e)) return;
       this.phim[e.code] = true;
-      if (e.code === 'KeyM' && !e.repeat) this.doiCheDo();
+      if (e.code === 'KeyM' && !e.repeat && !HALONG.boQuaPhimTat(e)) this.doiCheDo();
       // Chặn hành vi mặc định: Space cuộn trang / bấm nhầm nút đang focus, mũi tên cuộn trang
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) >= 0) {
         e.preventDefault();
@@ -195,6 +194,12 @@
       o.rotation.set(0, goc, 0);
     },
 
+    // Trong hang: đầu cao hơn sàn hang ≥ 1,5 m (ngoài phễu trên mặt nước thì hạ dần về 1,6 m)
+    giuTrenSanHang: function (hang, p) {
+      var sanToiThieu = hang.doCaoDauToiThieu(this.dau);
+      if (this.dau.y < sanToiThieu) { p.y += sanToiThieu - this.dau.y; this.dau.y = sanToiThieu; }
+    },
+
     // Đẩy người dùng ra nếu đi vào đảo / ra khỏi vùng chơi / xuống dưới nước
     gioiHan: function () {
       var d = this.data;
@@ -210,18 +215,21 @@
       if (hang) {
         if (hang.trong(this.dau)) {
           this.trongHang = true;
-          var sanToiThieu = hang.sanY + 1.5;                  // đầu cao hơn sàn hang ≥ 1.5 m
-          if (this.dau.y < sanToiThieu) { p.y += sanToiThieu - this.dau.y; this.dau.y = sanToiThieu; }
+          this.giuTrenSanHang(hang, p);
           return;
         }
         // (chỉ còn tính "đang trong hang" khi ở gần hang – tránh bị kéo về hang từ nơi khác)
-        if (this.trongHang && this.dau.distanceTo(hang.Cc) < 45) {
+        if (this.trongHang && this.dau.distanceTo(hang.Cc) < 45 + hang.daiPheu) {
           if (hang.raNgoaiCua(this.dau)) {
             this.trongHang = false;                          // đã ra khỏi hang qua cửa
           } else {
             var truocKep = this.dau.clone();                 // định đâm vào vách → kéo về trong hang
             hang.kep(this.dau);
             p.add(this.dau.sub(truocKep));
+            // elip khoang hang thò xuống dưới sàn → kẹp xong vẫn phải giữ đầu trên sàn,
+            // nếu không khung sau sẽ bị đẩy giật lên ~2 m
+            this.el.sceneEl.camera.getWorldPosition(this.dau);
+            this.giuTrenSanHang(hang, p);
             return;
           }
         }
@@ -231,20 +239,25 @@
       // Mỗi đảo là 1 hình ELIP (đảo bị kéo dài theo 1 trục và xoay 1 góc).
       // Cách xét: đổi vị trí đầu sang hệ tọa độ riêng của đảo (xoay ngược), chia cho
       // 2 bán trục → nếu nằm trong hình tròn đơn vị (q < 1) là đang ở trong đảo.
-      var vatCan = HALONG.vatCan, k = d.khoangCachDao;
+      var vatCan = HALONG.vatCan;
       for (var i = 0; i < vatCan.length; i++) {
         var o = vatCan[i];
-        if (this.dau.y > o.cao + 2) continue;          // đang bay cao hơn đỉnh đảo → cho qua
+        // Vật cản nhỏ (nhà bè ~5 m) khác đảo (hàng chục mét): vùng "đẩy lên nóc" và độ nâng
+        // phải nhỏ theo, nếu không chạm nhà ở tầm mắt là bị hất thẳng lên 4–5 m
+        var nho = o.cao < 10;
+        var vuotDinh = nho ? 0.8 : 2;
+        if (this.dau.y > o.cao + vuotDinh) continue;   // đang bay cao hơn đỉnh → cho qua
+        var k = o.le != null ? o.le : d.khoangCachDao;
         var dx = this.dau.x - o.x, dz = this.dau.z - o.z;
         var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0);
         var lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
         var ax = (o.rX || o.r) + k, az = (o.rZ || o.r) + k;
         var q = Math.hypot(lx / ax, lz / az);
         if (q >= 1) continue;
-        // Hạ xuống từ phía trên, sát đỉnh → đẩy LÊN (đứng trên đỉnh đảo),
+        // Hạ xuống từ phía trên, sát đỉnh → đẩy LÊN (đứng trên đỉnh),
         // thay vì văng ngang hàng chục mét trong 1 khung hình
-        if (this.dau.y > o.cao - 4 && o.cao + 0.4 <= d.doCaoToiDa) {
-          var len = o.cao + 2 - this.dau.y;
+        if (this.dau.y > o.cao - (nho ? 0.6 : 4) && o.cao + 0.4 <= d.doCaoToiDa) {
+          var len = o.cao + vuotDinh - this.dau.y;
           p.y += len; this.dau.y += len;
           continue;
         }

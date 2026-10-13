@@ -297,8 +297,9 @@
     '',
     '  // 5b) Ban đêm: ánh đèn lồng phản chiếu thành vệt lung linh trên mặt nước.',
     '  //     Giống vệt nắng: tia phản xạ R càng trùng hướng tới đèn càng sáng; sóng làm',
-    '  //     R dao động nên vệt sáng bị kéo dài, lăn tăn. Ban ngày bỏ qua cả vòng lặp.',
-    '  if (uDem > 0.01) {',
+    '  //     R dao động nên vệt sáng bị kéo dài, lăn tăn. Ban ngày, hoặc điểm nước đã chìm',
+    '  //     hẳn trong sương (sát chân trời) thì bỏ qua cả vòng lặp.',
+    '  if (uDem > 0.01 && heSoSuong(xa) < 0.97) {',
     '    float anhDen = 0.0;',
     '    for (int i = 0; i < 8; i++) {',
     '      vec4 den = uDenLong[i];',
@@ -346,6 +347,7 @@
       this.denGan = [];
       for (i = 0; i < 8; i++) this.denGan.push(new THREE.Vector4());
       this.dsDenTam = [];
+      this.dsDenThuyen = [];
       var cam = this.viTriCam = new THREE.Vector3();
       this.soSanhDen = function (a, b) { return a.distanceToSquared(cam) - b.distanceToSquared(cam); };
 
@@ -391,12 +393,21 @@
         if (den[0].w !== 0) for (i = 0; i < den.length; i++) den[i].set(0, 0, 0, 0);
         return;
       }
-      var ds = this.dsDenTam;
+      var ds = this.dsDenTam, cam = this.viTriCam;
       ds.length = 0;
+      // Đèn thuyền: 6 chiếc sát nhau → bóng gần như trùng nhau (và đứng trên boong thì bị
+      // thân thuyền che) → chỉ lấy 2 chiếc gần nhất, nhường chỗ cho đèn làng chài
       var thuyen = HALONG.thuyen && HALONG.thuyen.denLongTheGioi;
-      if (thuyen) for (i = 0; i < thuyen.length; i++) ds.push(thuyen[i]);
+      if (thuyen) {
+        var dsThuyen = this.dsDenThuyen;
+        dsThuyen.length = 0;
+        for (i = 0; i < thuyen.length; i++) dsThuyen.push(thuyen[i]);
+        dsThuyen.sort(this.soSanhDen);
+        for (i = 0; i < Math.min(2, dsThuyen.length); i++) ds.push(dsThuyen[i]);
+      }
+      // Đèn cố định xa quá 160 m: vệt sáng đã mờ hẳn (suy giảm + sương) → bỏ, đỡ vòng lặp mỗi điểm ảnh
       var tinh = HALONG.denLongTinh || [];
-      for (i = 0; i < tinh.length; i++) ds.push(tinh[i]);
+      for (i = 0; i < tinh.length; i++) if (tinh[i].distanceToSquared(cam) < 160 * 160) ds.push(tinh[i]);
       ds.sort(this.soSanhDen);
       for (i = 0; i < den.length; i++) {
         if (i < ds.length) den[i].set(ds[i].x, ds[i].y, ds[i].z, 1);

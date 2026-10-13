@@ -27,7 +27,8 @@
         '<h1>Vịnh Hạ Long VR</h1>',
         '<p class="phu-de">Du thuyền hoàng hôn</p>',
         '<ul>',
-        '<li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi lại</li>',
+        '<li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / mũi tên: đi lại</li>',
+        '<li class="ghi-chu">W không chạy? Tắt bộ gõ tiếng Việt (Unikey)</li>',
         '<li><b>Giữ chuột + kéo</b> để xoay</li>',
         '<li><kbd>Shift</kbd> đi nhanh</li>',
         '<li><kbd>M</kbd> đổi chế độ Du thuyền / Tự do</li>',
@@ -94,6 +95,7 @@
       HALONG.thongKe = { fps: 0, drawCall: 0, tamGiac: 0 };
 
       this.khiNhanPhim = function (e) {
+        if (HALONG.boQuaPhimTat(e)) return;
         // !e.repeat: giữ phím lâu thì trình duyệt tự lặp keydown → bảng sẽ nhấp nháy
         if (e.code === 'KeyH' && !e.repeat) this.bangHuongDan.classList.toggle('an');
         // Phím 1 2 3: Ngày / Hoàng hôn / Đêm
@@ -103,8 +105,9 @@
       window.addEventListener('keydown', this.khiNhanPhim);
 
       // Điện thoại không có bàn phím: bảng phím chỉ che màn hình → ẩn sẵn
-      // (Mốc 5 sẽ thêm nút ảo + hướng dẫn cảm ứng)
-      if (AFRAME.utils.device.isMobile()) this.bangHuongDan.classList.add('an');
+      // (Mốc 5 sẽ thêm nút ảo + hướng dẫn cảm ứng). Màn thấp (điện thoại / cửa sổ xoay ngang)
+      // cũng ẩn sẵn: bảng cao ~300 px sẽ đè lên chip và bảng điểm dừng ở dưới. Phím H vẫn mở lại.
+      if (AFRAME.utils.device.isMobile() || window.innerHeight < 520) this.bangHuongDan.classList.add('an');
 
       // Nút kính VR: máy không hỗ trợ WebXR "immersive-vr" (laptop không cắm kính) thì
       // bấm nút chỉ làm khung 3D toàn màn hình và che HUD → ẩn nút đi.
@@ -163,8 +166,40 @@
       ten.textContent = dd.ten;
       var moTa = document.createElement('p');
       moTa.textContent = dd.moTa;
-      this.bangDiemDung.append(nhan, ten, moTa);
+      // Gợi ý quay đầu: thuyền neo theo hướng lộ trình nên cảnh được giới thiệu có thể nằm
+      // ngoài khung nhìn (bên hông, sau lưng) → chỉ hướng cho người xem
+      this.huongNhin = document.createElement('div');
+      this.huongNhin.className = 'huong-nhin';
+      this.huongNhin.hidden = true;
+      this.chuHuongNhin = '';
+      this.vatTheDiem = dd.vatThe || null;
+      this.bangDiemDung.append(nhan, ten, moTa, this.huongNhin);
       this.bangDiemDung.classList.remove('an');
+    },
+
+    // Cảnh đang giới thiệu nằm bên trái / phải / sau lưng hướng nhìn? (chạy mỗi khung, rất nhẹ)
+    capNhatHuongNhin: function () {
+      if (!this.vatTheDiem || !this.huongNhin || this.bangDiemDung.classList.contains('an')) return;
+      var cam = this.el.camera;
+      if (!cam) return;
+      var f = this.huongCam || (this.huongCam = new THREE.Vector3());
+      var p = this.viTriCam || (this.viTriCam = new THREE.Vector3());
+      cam.getWorldDirection(f);
+      cam.getWorldPosition(p);
+      var tx = this.vatTheDiem.x - p.x, tz = this.vatTheDiem.z - p.z;
+      // góc có dấu từ hướng nhìn tới cảnh (nhìn từ trên xuống): > 0 bên trái, < 0 bên phải
+      var goc = Math.atan2(f.z * tx - f.x * tz, f.x * tx + f.z * tz) * 180 / Math.PI;
+      // nửa góc nhìn NGANG thật của màn hình (rộng ~56° trên laptop, ~22° trên điện thoại dọc):
+      // ma trận chiếu [0] = 1 / tan(nửa góc ngang). Cảnh còn trong khung (chừa 8° mép) thì không nhắc.
+      var nuaNgang = Math.atan(1 / cam.projectionMatrix.elements[0]) * 180 / Math.PI;
+      var lech = Math.abs(goc), trai = goc > 0;
+      var chu = lech < nuaNgang - 8 ? ''
+        : lech > 100 ? (trai ? '◀ Ở phía sau, bên trái' : 'Ở phía sau, bên phải ▶')
+        : (trai ? '◀ Nhìn sang trái' : 'Nhìn sang phải ▶');
+      if (chu === this.chuHuongNhin) return;          // chỉ đụng DOM khi nội dung đổi
+      this.chuHuongNhin = chu;
+      this.huongNhin.textContent = chu;
+      this.huongNhin.hidden = !chu;
     },
 
     // Nội dung chip: chế độ hiện tại + điểm kế tiếp / thời gian còn neo
@@ -183,6 +218,7 @@
 
     tick: function (t, dt) {
       if (!dt) return;
+      this.capNhatHuongNhin();
       this.soKhung++;
       this.thoiGianDem += dt;
       if (this.thoiGianDem < 500) return;   // cập nhật 2 lần/giây cho dễ đọc
