@@ -4,8 +4,6 @@ Trải nghiệm thực tế ảo chạy trên trình duyệt (WebXR), làm bằn
 Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng code**: không dùng ảnh, mô hình 3D hay
 âm thanh tải từ ngoài nên chạy offline được 100%.
 
-> Đây là bản nháp README (đang ở Mốc 5). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
-
 ## Cách chạy
 
 | Cách | Làm thế nào | Ghi chú |
@@ -174,4 +172,3 @@ WebVR-HaLong/
 - [x] **Mốc 3**: làng chài, hang động, sinh vật, chu kỳ ngày/đêm
 - [x] **Mốc 4**: hotspot thông tin, HUD, minimap, âm thanh, màn hình chờ, chụp ảnh
 - [x] **Mốc 5**: WebXR (tay cầm, teleport, snap turn), điện thoại, tối ưu, chế độ chất lượng
-- [ ] Mốc 6: README đầy đủ + BAO_CAO.md
