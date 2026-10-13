@@ -19,7 +19,8 @@
  *   9. Thông báo: khung HTML trên màn hình + khung 3D gắn trước mắt khi đeo kính VR
  *      (đổi chế độ, đổi thời điểm bằng nút tay cầm... cần có phản hồi nhìn thấy được).
  *  10. Màn cảm ứng (điện thoại, máy tính bảng): cần điều khiển ảo để đi lại, nút bay
- *      lên / xuống, nút đổi chế độ; vuốt màn hình để xoay; nghiêng máy để nhìn (con quay).
+ *      lên / xuống, nút đổi chế độ; vuốt màn hình để xoay (tự xử lý theo từng ngón, nên
+ *      vừa giữ cần ảo vừa vuốt được); nghiêng máy để nhìn (con quay).
  * ========================================================================= */
 (function () {
   'use strict';
@@ -247,10 +248,16 @@
         sceneEl.object3D.visible = true;                // hiện lại khung cảnh đã ẩn lúc chờ
         if (HALONG.amThanh) HALONG.amThanh.batDau();     // ngay trong thao tác bấm → được phép phát tiếng
         // iPhone / iPad (iOS 13+): phải xin quyền con quay hồi chuyển trong 1 thao tác bấm
-        // thì "nghiêng máy để nhìn" mới chạy (look-controls dùng sự kiện deviceorientation)
+        // thì "nghiêng máy để nhìn" mới chạy. Trên iOS look-controls tự TẮT con quay và chỉ bật
+        // lại khi cảnh phát sự kiện 'deviceorientationpermissiongranted' (bình thường do hộp
+        // thoại xin quyền của A-Frame phát – ở đây đã tắt hộp thoại đó nên phải tự phát).
         var DOE = window.DeviceOrientationEvent;
         if (DOE && typeof DOE.requestPermission === 'function') {
-          try { DOE.requestPermission().catch(function () {}); } catch (e) { /* trình duyệt từ chối */ }
+          try {
+            DOE.requestPermission().then(function (kq) {
+              if (kq === 'granted') sceneEl.emit('deviceorientationpermissiongranted');
+            }).catch(function () {});
+          } catch (e) { /* trình duyệt từ chối */ }
         }
         if (man) {
           if (nut) nut.blur();                           // không giữ focus trên nút đã ẩn
@@ -826,6 +833,32 @@
       can.addEventListener('pointerup', tha);
       can.addEventListener('pointercancel', tha);
 
+      // Vuốt để nhìn: tự làm bằng Pointer Events, theo ĐÚNG ngón đặt lên khung 3D.
+      // look-controls của A-Frame bỏ qua khi có hơn 1 ngón chạm và luôn đọc ngón đầu tiên
+      // → đang giữ cần ảo thì không vuốt nhìn được → tắt phần cảm ứng của nó.
+      // Chiều quay giống A-Frame ("kéo cảnh"): vuốt ngang trọn bề rộng màn hình = quay 180°.
+      var sc = this.el, camEl = document.querySelector('[look-controls]'), canvas = sc.canvas;
+      if (camEl && canvas) {
+        camEl.setAttribute('look-controls', 'touchEnabled', false);
+        var ngonNhin = null, nx = 0, ny = 0;
+        canvas.addEventListener('pointerdown', function (e) {
+          if (e.pointerType !== 'touch' || ngonNhin !== null) return;
+          ngonNhin = e.pointerId; nx = e.clientX; ny = e.clientY;
+        });
+        canvas.addEventListener('pointermove', function (e) {
+          if (e.pointerId !== ngonNhin || sc.is('vr-mode')) return;
+          var lc = camEl.components['look-controls'], w = canvas.clientWidth || 1;
+          if (!lc) return;
+          lc.yawObject.rotation.y += Math.PI * (e.clientX - nx) / w;
+          var pitch = lc.pitchObject.rotation.x + Math.PI * (e.clientY - ny) / w;
+          lc.pitchObject.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+          nx = e.clientX; ny = e.clientY;
+        });
+        var thaNhin = function (e) { if (e.pointerId === ngonNhin) ngonNhin = null; };
+        canvas.addEventListener('pointerup', thaNhin);
+        canvas.addEventListener('pointercancel', thaNhin);
+      }
+
       // Nút bay lên / xuống: giữ để bay (chỉ hiện ở chế độ Tự do)
       [['#nut-bay-len', 1], ['#nut-bay-xuong', -1]].forEach(function (cap) {
         var nut = khung.querySelector(cap[0]);
@@ -875,7 +908,8 @@
         'FPS ' + tk.fps + '  ·  Draw call ' + tk.drawCall +
         '  ·  Tam giác ' + Math.round(tk.tamGiac / 1000) + 'k';
       this.bangThongSo.classList.toggle('cham', tk.fps < 45);   // đỏ khi dưới mục tiêu 45 FPS
-      this.doFpsDauTien(tk.fps);
+      // Mẫu kéo dài > 1 s = tab vừa bị ẩn / máy khựng 1 lần → không tính vào phép đo tự hạ chất lượng
+      if (this.thoiGianDem < 1000) this.doFpsDauTien(tk.fps);
       this.capNhatChip();
 
       this.soKhung = 0;

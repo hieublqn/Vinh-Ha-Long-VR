@@ -36,6 +36,7 @@
  *   Grip trái / phải : hạ xuống / bay lên (chế độ Tự do)
  *   Cò (trigger)  : bấm biểu tượng "i", nút trên bảng thuyết minh (tia laser của laser-controls)
  *   X: đổi chế độ · Y: đổi thời điểm · A: đóng bảng / hành động (Vào hang...) · B: tắt / bật tiếng
+ *   Tia laser chỉ bật khi đang ở chế độ VR; tư thế tay lấy theo targetRaySpace (hướng ngắm).
  * ========================================================================= */
 (function () {
   'use strict';
@@ -275,7 +276,9 @@
       for (var i = 0; i < vatCan.length; i++) {
         var o = vatCan[i];
         if (p.y > o.cao) continue;
-        var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0), ox = p.x - o.x, oz = p.z - o.z;
+        var ox = p.x - o.x, oz = p.z - o.z, rMax = Math.max(o.rX || o.r, o.rZ || o.r);
+        if (Math.abs(ox) > rMax || Math.abs(oz) > rMax) continue;   // loại nhanh, khỏi tính sin/cos
+        var cs = Math.cos(o.xoay || 0), sn = Math.sin(o.xoay || 0);
         if (Math.hypot((ox * cs - oz * sn) / (o.rX || o.r), (ox * sn + oz * cs) / (o.rZ || o.r)) < 1) return true;
       }
       return false;
@@ -415,9 +418,19 @@
       var vong = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.007, 8, 24), new THREE.MeshBasicMaterial({ color: '#ffb26b' }));
       vong.rotation.x = 0.5; vong.position.set(0, 0.01, -0.02);
       nhom.add(than, vong);
+      // Tay cầm theo "tia ngắm" (targetRaySpace, xem khiKetNoi) mà mô hình dựng theo tư thế
+      // cầm nắm → ngửa mô hình lên ~38° (độ lệch giữa 2 hệ trên tay cầm Quest)
+      nhom.rotation.x = 0.67;
       nhom.visible = false;
       el.setObject3D('mo-hinh', nhom);
-      this.khiKetNoi = function () { nhom.visible = true; };
+      this.khiKetNoi = function () {
+        nhom.visible = true;
+        // oculus-touch-controls lấy tư thế "cầm nắm" (gripSpace) và chỉ chỉnh hướng tia (chúc
+        // xuống ~38°) khi tải xong mô hình 3D – mà ở đây model: false nên không bao giờ chỉnh
+        // → tia và vòng cung chĩa lệch lên trời. Đổi sang targetRaySpace: trục -Z của hệ này
+        // chính là hướng ngắm chuẩn WebXR, đúng với mọi loại tay cầm.
+        el.setAttribute('tracked-controls', 'space', 'targetRaySpace');
+      };
       this.khiNgat = function () { nhom.visible = false; self.datLai(); };
       el.addEventListener('controllerconnected', this.khiKetNoi);
       el.addEventListener('controllerdisconnected', this.khiNgat);
@@ -447,6 +460,16 @@
       };
       Object.keys(this.cacNut).forEach(function (ten) { el.addEventListener(ten, self.cacNut[ten]); });
 
+      // Ngoài kính VR tay cầm không được theo dõi (đứng yên ở chân rig) nhưng tia vẫn dò
+      // → có thể "chạm" biểu tượng i một cách vô hình. Chỉ bật tia khi đang ở chế độ VR.
+      var sc = el.sceneEl;
+      this.batTia = function () { el.setAttribute('raycaster', 'enabled', sc.is('vr-mode')); };
+      sc.addEventListener('enter-vr', this.batTia);
+      sc.addEventListener('exit-vr', this.batTia);
+      this.batTia();
+      this.mauXanh = new THREE.Color('#6ee7d8');   // cung tới được
+      this.mauDo = new THREE.Color('#ff6b6b');     // cung không tới được
+
       // Vòng cung ngắm + vòng tròn đánh dấu điểm đến (chỉ tay phải), đặt thẳng trong cảnh
       if (this.data.tay === 'phai') {
         var hinhCung = new THREE.BufferGeometry();
@@ -470,13 +493,19 @@
       el.removeEventListener('gripdown', this.khiGripXuong);
       el.removeEventListener('gripup', this.khiGripLen);
       Object.keys(this.cacNut).forEach(function (ten) { el.removeEventListener(ten, self.cacNut[ten]); });
+      el.sceneEl.removeEventListener('enter-vr', this.batTia);
+      el.sceneEl.removeEventListener('exit-vr', this.batTia);
       if (this.cung) { this.cung.parent.remove(this.cung); this.dich.parent.remove(this.dich); }
       el.removeObject3D('mo-hinh');
     },
 
+    // Component dieu-khien của rig (tìm 1 lần rồi nhớ: tick gọi hàm này mỗi khung khi ngắm)
     dieuKhien: function () {
-      var rig = document.querySelector('[dieu-khien]');
-      return rig && rig.components['dieu-khien'];
+      if (!this.dk) {
+        var rig = document.querySelector('[dieu-khien]');
+        this.dk = rig && rig.components['dieu-khien'];
+      }
+      return this.dk;
     },
 
     datLai: function () {
@@ -519,8 +548,22 @@
     thucHienDichChuyen: function () {
       var dk = this.dieuKhien(), loai = this.loaiDich, diem = this.diemDich.clone();
       if (!dk || !loai) return;
+      // Đích trên boong: nhớ theo hệ toạ độ THUYỀN. Lúc màn tối xong (0,1 s sau) thuyền đã
+      // chạy thêm ~0,5 m và có thể đã rẽ → đổi lại sang hệ thế giới theo vị trí thuyền lúc đó.
+      var tt = HALONG.thuyen, bx = 0, bz = 0;
+      if (loai === 'boong' && tt) {
+        var c = Math.cos(tt.goc), s = Math.sin(tt.goc), dx = diem.x - tt.viTri.x, dz = diem.z - tt.viTri.z;
+        bx = dx * c - dz * s; bz = dx * s + dz * c;
+      }
       // "Chớp mắt" rất nhanh (0,1 s tối, 0,18 s sáng) → không thấy cảnh trượt, đỡ chóng mặt
-      var lam = function () { dk.dichChuyenToi(diem, loai); };
+      var lam = function () {
+        if (loai === 'boong' && tt) {
+          var c2 = Math.cos(tt.goc), s2 = Math.sin(tt.goc);
+          diem.x = tt.viTri.x + bx * c2 + bz * s2;
+          diem.z = tt.viTri.z - bx * s2 + bz * c2;
+        }
+        dk.dichChuyenToi(diem, loai);
+      };
       if (!HALONG.chuyenCanh || !HALONG.chuyenCanh(lam, 0.1, 0.18)) lam();
     },
 
@@ -588,11 +631,11 @@
       this.cung.geometry.attributes.position.needsUpdate = true;
       this.loaiDich = loai;
       this.diemDich.copy(p);
-      var mau = loai ? '#6ee7d8' : '#ff6b6b';                       // xanh: tới được · đỏ: không
-      this.vlCung.color.set(mau);
+      var mau = loai ? this.mauXanh : this.mauDo;                   // xanh: tới được · đỏ: không
+      this.vlCung.color.copy(mau);
       this.cung.visible = true;
       this.dich.visible = !!loai;
-      if (loai) { this.dich.position.copy(p); this.dich.position.y += 0.03; this.dich.material.color.set(mau); }
+      if (loai) { this.dich.position.copy(p); this.dich.position.y += 0.03; this.dich.material.color.copy(mau); }
     }
   });
 })();

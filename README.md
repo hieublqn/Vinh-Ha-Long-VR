@@ -109,12 +109,13 @@ Bấm nút kính VR ở góc phải dưới để vào chế độ VR. Mỗi tay
 | Nút **B** | Tắt / bật âm thanh |
 
 Mỗi lần bấm nút có một dòng thông báo nhỏ hiện trước mắt khoảng 2 giây (vì bảng HTML không hiển thị
-trong kính). Mô hình tay cầm cũng được vẽ bằng code (thân trụ + vòng cam) nên không cần tải file.
+trong kính); khi nút A có việc để làm (Vào hang / Ra khỏi hang) cũng có thông báo nhắc. Mô hình tay cầm cũng được vẽ bằng code (thân trụ + vòng cam) nên không cần tải file.
 
 ## Điều khiển trên điện thoại / máy tính bảng
 
 Màn hình cảm ứng được nhận ra tự động:
-- **Vuốt** trên màn hình để xoay góc nhìn; **nghiêng máy** để nhìn quanh (con quay hồi chuyển — trên iPhone
+- **Vuốt** trên màn hình để xoay góc nhìn (ngang và lên / xuống; vừa giữ cần ảo vừa vuốt bằng ngón
+  kia được); **nghiêng máy** để nhìn quanh (con quay hồi chuyển — trên iPhone
   trình duyệt sẽ hỏi quyền khi bấm *Bắt đầu*, chọn *Cho phép*).
 - **Cần ảo** góc dưới trái: kéo núm để đi lại.
 - Cột nút góc dưới phải: **🕊 Bay tự do / ⛵ Lên thuyền** đổi chế độ; ở chế độ Tự do có thêm **▲ / ▼**

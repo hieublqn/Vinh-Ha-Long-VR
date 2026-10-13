@@ -407,6 +407,7 @@ body.cam-ung #dieu-khien-cam-ung { display: block; }
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
+  pointer-events: none;                   /* khoảng trống cạnh nút ▲▼ không nuốt cú chạm */
 }
 #nut-cam-ung button {
   min-width: 56px;
@@ -420,17 +421,21 @@ body.cam-ung #dieu-khien-cam-ung { display: block; }
   border: 1px solid var(--vien-khung);
   border-radius: 26px;
   touch-action: none;
+  pointer-events: auto;
 }
 #nut-cam-ung #nut-bay-len, #nut-cam-ung #nut-bay-xuong { display: none; font-size: 20px; }
 body.che-do-tu-do #nut-cam-ung #nut-bay-len,
 body.che-do-tu-do #nut-cam-ung #nut-bay-xuong { display: block; }
 /* Màn cảm ứng: chip + bảng điểm dừng lên phía trên (phía dưới dành cho cần ảo và nút),
-   ẩn bảng thông số và nút kính VR của A-Frame không che nút */
+   ẩn bảng thông số. Nút kính VR của A-Frame chuyển sang trái, trên cần ảo: cột bên phải
+   đã kín (nút thời điểm, bản đồ, ▲ ▼, nút đổi chế độ) */
 body.cam-ung #chip-che-do { top: 60px; bottom: auto; font-size: 12px; }
 body.cam-ung #bang-diem-dung { top: 100px; bottom: auto; }
 body.cam-ung #bang-thong-so { display: none; }
 body.cam-ung #thong-bao { bottom: 160px; }
-body.cam-ung .a-enter-vr { bottom: 160px !important; }
+body.cam-ung .a-enter-vr { bottom: 160px !important; left: 20px !important; right: auto !important; }
+/* Khung 3D nhận trọn cú vuốt (không để trình duyệt cuộn / phóng to rồi huỷ ngón đang nhìn) */
+body.cam-ung .a-canvas { touch-action: none; }
 
 /* Màn thấp (điện thoại xoay ngang): bản đồ nhỏ lại để không đè bảng điểm dừng */
 @media (max-height: 520px) {
@@ -447,8 +452,9 @@ body.cam-ung .a-enter-vr { bottom: 160px !important; }
   body.dang-thuyet-minh #chip-che-do { opacity: 0.3; }
 }
 
-/* Màn hẹp (điện thoại dọc): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm */
-@media (max-width: 600px) {
+/* Màn hẹp (điện thoại dọc, cửa sổ hẹp): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm.
+   Mốc 5 thêm nút ⚙ làm cụm nút thời điểm rộng ~330px → dưới ~680px là đè bảng hướng dẫn */
+@media (max-width: 700px) {
   #bang-huong-dan {
     top: 64px;
     max-width: 200px;
@@ -461,4 +467,9 @@ body.cam-ung .a-enter-vr { bottom: 160px !important; }
   #bang-thong-so { max-width: calc(100vw - 140px); font-size: 11px; }
   #ban-do { width: 128px; height: 128px; }
   #thong-bao { bottom: 150px; max-width: calc(100vw - 40px); font-size: 12px; }
+}
+
+/* Điện thoại dọc: thông báo lên cao hơn cột nút ▲ ▼ bên phải (màn hẹp, thông báo gần hết bề ngang) */
+@media (max-width: 600px) {
+  body.cam-ung #thong-bao { bottom: 210px; }
 }
