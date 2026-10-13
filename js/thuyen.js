@@ -569,7 +569,8 @@
       var d = this.data, ds = LO_TRINH.diemDung, L = LO_TRINH.doDai;
 
       if (this.trangThai === 'dung') {
-        this.cho -= giay;
+        // Còn ở màn hình chờ thì chưa đếm giờ neo (không để thuyền tự rời bến khi chưa ai xem)
+        if (HALONG.daBatDau !== false) this.cho -= giay;
         if (this.cho <= 0) {
           this.trangThai = 'chay';
           this.el.emit('roi-diem-dung', { chiSo: this.chiSoDung });

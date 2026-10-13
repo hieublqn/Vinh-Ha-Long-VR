@@ -38,9 +38,35 @@
   <script src="js/hang-dong.js"></script>
   <script src="js/sinh-vat.js"></script>
   <script src="js/dieu-khien.js"></script>
+  <script src="js/diem-thong-tin.js"></script>
+  <script src="js/am-thanh.js"></script>
   <script src="js/giao-dien.js"></script>
 </head>
 <body>
+  <!-- MÀN HÌNH CHỜ: hiện ngay khi trang mở (trước cả lúc A-Frame dựng xong khung cảnh).
+       Nút "Bắt đầu" chỉ bấm được khi khung cảnh đã dựng + biên dịch shader xong.
+       Bấm nút = thao tác của người dùng → trình duyệt mới cho phép phát âm thanh.
+       Hình đảo đá vôi là SVG viết tay ngay trong trang (không tải ảnh ngoài). -->
+  <div id="man-hinh-cho" role="dialog" aria-labelledby="mhc-tieu-de">
+    <svg class="mhc-dao" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <circle cx="600" cy="236" r="70" fill="#ffd58a" opacity="0.85"/>
+      <path fill="#3b2447" d="M0 300 V250 C40 250 50 170 90 165 C130 160 140 245 175 250 H230 C250 250 255 120 300 110 C350 100 345 240 380 250 H520 C540 250 545 200 575 195 C600 192 610 250 630 250 H760 C790 250 790 130 840 120 C895 110 880 245 915 250 H990 C1010 250 1020 185 1060 180 C1100 176 1100 250 1130 250 H1200 V300 Z"/>
+      <path fill="#22142e" d="M0 300 V268 C60 268 70 215 110 212 C150 210 150 268 190 268 H420 C440 268 450 225 480 222 C510 220 515 268 540 268 H860 C890 268 900 205 940 200 C985 196 980 268 1010 268 H1200 V300 Z"/>
+    </svg>
+    <div class="mhc-khung">
+      <h1 id="mhc-tieu-de">Vịnh Hạ Long VR</h1>
+      <p class="mhc-phu-de">Du thuyền hoàng hôn</p>
+      <div class="mhc-thanh" aria-hidden="true"><div></div></div>
+      <p class="mhc-trang-thai" id="mhc-trang-thai" aria-live="polite">Đang dựng vịnh Hạ Long…</p>
+      <button id="nut-bat-dau" type="button" disabled>Bắt đầu</button>
+      <ul class="mhc-meo">
+        <li>Thuyền tự chạy qua 5 điểm tham quan. Phím <b>M</b> để rời thuyền bay tự do.</li>
+        <li>Bấm vào biểu tượng <b>i</b> nổi trên cảnh để đọc thuyết minh.</li>
+        <li>Có âm thanh: nên đeo tai nghe. Phím <b>T</b> tắt / bật tiếng.</li>
+      </ul>
+    </div>
+  </div>
+
   <!--
     renderer:
       antialias      : khử răng cưa
@@ -53,13 +79,18 @@
     keyboard-shortcuts="enterVR: false": tắt phím F (A-Frame mặc định dùng F để vào VR;
       máy không có kính thì F làm khung 3D toàn màn hình và che mất bảng HUD).
     xr-mode-ui: nút kính VR góc phải (giao-dien.js tự ẩn nút nếu máy không hỗ trợ VR).
+    loading-screen="enabled: false": dùng màn hình chờ riêng ở trên (có nút Bắt đầu).
+    cursor + raycaster: bấm chuột / chạm vào biểu tượng "i" (class diem-tt) để mở bảng
+      thuyết minh. Raycaster CHỈ xét các vật có class diem-tt và 12,5 lần/giây → rất nhẹ.
   -->
   <a-scene
     renderer="antialias: true; alpha: false; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; exposure: 1.1"
     light="defaultLightsEnabled: false"
     keyboard-shortcuts="enterVR: false"
     xr-mode-ui="enabled: true"
-    loading-screen="dotsColor: #ffb26b; backgroundColor: #1b1530"
+    loading-screen="enabled: false"
+    cursor="rayOrigin: mouse; fuse: false"
+    raycaster="objects: .diem-tt; far: 400; interval: 80"
     giao-dien>
 
     <!-- Bầu trời + mặt trời/mặt trăng + ánh sáng. Bắt đầu lúc hoàng hôn;
@@ -80,6 +111,12 @@
 
     <!-- Sinh vật: đàn hải âu bay theo thuyền, đom đóm ban đêm -->
     <a-entity id="sinh-vat" hai-au dom-dom></a-entity>
+
+    <!-- Điểm thông tin (biểu tượng "i" bấm được) + bảng thuyết minh 3D -->
+    <a-entity id="diem-thong-tin" diem-thong-tin></a-entity>
+
+    <!-- Âm thanh tạo bằng code (Web Audio): sóng, gió, hải âu, côn trùng, giọt nước trong hang -->
+    <a-entity id="am-thanh" am-thanh></a-entity>
 
     <!-- Thuyền buồm + du thuyền tự động theo lộ trình.
          Lưu ý: A-Frame chạy tick() theo LOẠI component (thứ tự đăng ký), không theo

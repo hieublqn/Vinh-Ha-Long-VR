@@ -70,7 +70,7 @@ html, body {
   line-height: 1.9;
 }
 #bang-huong-dan .ghi-chu {
-  margin: -4px 0 2px;
+  margin: 0 0 2px;
   font-size: 12px;
   line-height: 1.4;
   color: var(--chu-phu);
@@ -113,6 +113,22 @@ kbd {
   border-radius: 999px;
 }
 #chip-che-do b { color: var(--nhan); }
+/* Nút hành động trong chip ("Vào hang ▸"...): chip không nhận chuột, riêng nút thì có */
+#chip-che-do .nut-chip {
+  margin-left: 10px;
+  padding: 3px 12px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  color: #2a1d3d;
+  background: var(--nhan);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#chip-che-do .nut-chip[hidden] { display: none; }
+#chip-che-do .nut-chip:hover { filter: brightness(1.1); }
 #chip-che-do .goi-y {
   margin-left: 8px;
   font-size: 12px;
@@ -190,10 +206,168 @@ kbd {
   color: #2a1d3d;
   background: var(--nhan);
 }
+#nut-thoi-diem .nut-loa {
+  margin-left: 2px;
+  padding: 6px 10px;
+  border-left: 1px solid var(--vien-khung);
+  border-radius: 0 999px 999px 0;
+}
+#nut-thoi-diem .nut-loa.dang-tat { opacity: 0.7; }
+
+/* Bản đồ nhỏ – góc phải, dưới nút thời điểm */
+#ban-do {
+  top: 64px;
+  right: 16px;
+  width: 200px;
+  height: 200px;
+  padding: 0;
+  overflow: hidden;
+  transition: opacity 0.3s;
+}
+#ban-do.an { opacity: 0; }
+
+/* Thông báo ngắn (đã lưu ảnh...) – giữa, phía dưới */
+#thong-bao {
+  left: 50%;
+  bottom: 120px;
+  padding: 8px 16px;
+  font-size: 14px;
+  transform: translateX(-50%);
+  transition: opacity 0.4s;
+}
+#thong-bao.an { opacity: 0; }
+
+/* Nháy trắng khi chụp ảnh */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+body.nhay-chup::after { opacity: 0.55; transition: none; }
+
+/* Rê chuột lên biểu tượng "i" (A-Frame cursor gắn class này cho canvas) */
+.a-mouse-cursor-hover { cursor: pointer; }
+
+/* ---------- Màn hình chờ (Mốc 4) ----------
+   Nền gradient hoàng hôn + dải đảo đá vôi SVG. Thanh "đang tải" chạy bằng CSS transform:
+   trình duyệt vẽ hiệu ứng này ở luồng riêng (compositor) nên vẫn chạy mượt cả khi luồng
+   chính đang bận dựng đảo / biên dịch shader. */
+#man-hinh-cho {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--chu);
+  background: linear-gradient(180deg, #1b1236 0%, #4a2a5e 38%, #b8566a 68%, #f2a66a 86%, #ffd59a 100%);
+  transition: opacity 0.7s;
+}
+#man-hinh-cho.an-di { opacity: 0; pointer-events: none; }
+#man-hinh-cho .mhc-dao {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 38%;
+}
+#man-hinh-cho .mhc-khung {
+  position: relative;
+  width: min(460px, calc(100vw - 40px));
+  box-sizing: border-box;
+  padding: 28px 30px 22px;
+  text-align: center;
+  background: rgba(20, 16, 40, 0.62);
+  border: 1px solid var(--vien-khung);
+  border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+#man-hinh-cho h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: 0.5px;
+  color: var(--nhan);
+}
+#man-hinh-cho .mhc-phu-de {
+  margin: 4px 0 18px;
+  font-size: 16px;
+  color: var(--chu-phu);
+}
+#man-hinh-cho .mhc-thanh {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+#man-hinh-cho .mhc-thanh div {
+  width: 35%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--nhan);
+  animation: mhc-chay 1.3s ease-in-out infinite;
+}
+#man-hinh-cho.san-sang .mhc-thanh div { width: 100%; animation: none; }
+@keyframes mhc-chay {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(290%); }
+}
+#man-hinh-cho .mhc-trang-thai {
+  min-height: 20px;
+  margin: 10px 0 16px;
+  font-size: 14px;
+  color: var(--chu-phu);
+}
+#nut-bat-dau {
+  padding: 12px 44px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 18px;
+  color: #2a1d3d;
+  background: var(--nhan);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #c8794a;
+}
+#nut-bat-dau:disabled {
+  cursor: wait;
+  opacity: 0.45;
+  box-shadow: none;
+}
+#man-hinh-cho.san-sang #nut-bat-dau { animation: mhc-nhip 1.6s ease-in-out infinite; }
+#nut-bat-dau:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@keyframes mhc-nhip {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+#man-hinh-cho .mhc-meo {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: left;
+  color: var(--chu);
+}
+#man-hinh-cho .mhc-meo li { margin-top: 4px; padding-left: 14px; text-indent: -14px; }
+#man-hinh-cho .mhc-meo li::before { content: "• "; color: var(--nhan); }
+#man-hinh-cho .mhc-meo b { color: var(--nhan); }
 
 /* Màn cảm ứng: không có phím M nên bỏ gợi ý phím trong chip */
 @media (pointer: coarse) {
   #chip-che-do .goi-y { display: none; }
+}
+
+/* Màn thấp (điện thoại xoay ngang): bản đồ nhỏ lại để không đè bảng điểm dừng */
+@media (max-height: 520px) {
+  #ban-do { width: 128px; height: 128px; }
 }
 
 /* Màn vừa (cửa sổ chia đôi màn laptop, máy tính bảng, điện thoại xoay ngang):
@@ -216,4 +390,6 @@ kbd {
   #chip-che-do .goi-y { display: none; }
   /* chừa chỗ cho nút kính VR của A-Frame ở góc phải dưới */
   #bang-thong-so { max-width: calc(100vw - 140px); font-size: 11px; }
+  #ban-do { width: 128px; height: 128px; }
+  #thong-bao { bottom: 150px; max-width: calc(100vw - 40px); font-size: 12px; }
 }

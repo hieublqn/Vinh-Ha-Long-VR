@@ -364,7 +364,8 @@
       // Chia sẻ: vật cản (không bay xuyên nhà), đèn lồng tĩnh (vệt sáng trên mặt nước ban đêm)
       HALONG.vatCan = HALONG.vatCan.concat(vatCan);
       HALONG.denLongTinh = (HALONG.denLongTinh || []).concat(denLongTG);
-      HALONG.langChai = { x: C.x, z: C.z, cacNha: vatCan };
+      // diem(u, v): đổi toạ độ trong hệ của làng → thế giới (diem-thong-tin.js dùng để đặt biểu tượng)
+      HALONG.langChai = { x: C.x, z: C.z, cacNha: vatCan, diem: diem };
     },
 
     remove: function () {

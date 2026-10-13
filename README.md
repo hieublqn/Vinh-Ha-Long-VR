@@ -4,7 +4,7 @@ Trải nghiệm thực tế ảo chạy trên trình duyệt (WebXR), làm bằn
 Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng code**: không dùng ảnh, mô hình 3D hay
 âm thanh tải từ ngoài nên chạy offline được 100%.
 
-> Đây là bản nháp README (đang ở Mốc 3). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
+> Đây là bản nháp README (đang ở Mốc 4). Mốc 6 sẽ viết đầy đủ phần kiến trúc và giải thích.
 
 ## Cách chạy
 
@@ -26,6 +26,23 @@ Dòng đó chỉ cảnh báo chung về việc tải ảnh/mô hình. Dự án n
   Riêng đảo Bồ Hòn có **cửa hang Sửng Sốt** quay về phía điểm dừng: bay về phía giữa cửa vòm
   (từ ngoài biển có một "phễu" rộng ~10 m dẫn vào, càng gần vách càng thu hẹp về lòng hầm) để đi qua
   đường hầm vào khoang hang có nhũ đá và đèn màu. Muốn ra thì bay ngược ra cửa.
+  Nhanh hơn: bấm nút **Vào hang ▸** trên chip (khi neo ở điểm Hang Sửng Sốt hoặc bay gần cửa hang)
+  để dịch chuyển thẳng vào trong; trong hang có nút **Ra khỏi hang ▸** đưa về lại boong thuyền.
+
+## Bắt đầu, thuyết minh, âm thanh
+
+- **Màn hình chờ**: hiện trong lúc dựng khung cảnh. Nút **Bắt đầu** sáng lên khi đã sẵn sàng; bấm nút thì
+  thuyền mới rời bến và âm thanh mới bật (trình duyệt chỉ cho phát tiếng sau một cú bấm của người dùng).
+- **Biểu tượng "i"** nổi gần các cảnh (9 điểm: toàn cảnh vịnh, đảo đá vôi, Ti Tốp, Hang Sửng Sốt,
+  thạch nhũ trong hang, làng chài Cửa Vạn, nhà bè nuôi cá, Hòn Gà Chọi, thuyền buồm nâu). Bấm chuột
+  (hoặc chạm) vào biểu tượng → hiện **bảng thuyết minh 3D** trước mặt; bấm vào bảng (hoặc `Esc`) để đóng.
+  Khi đeo kính VR, tới điểm dừng là bảng thuyết minh 3D tự hiện.
+- **Âm thanh tạo bằng code** (Web Audio, không có file âm thanh): sóng biển, nước vỗ mạn thuyền, gió,
+  tiếng hải âu (ban ngày), dế kêu (ban đêm), giọt nước rơi vang trong hang. Âm thanh có hướng: quay đầu
+  là nghe tiếng chim đổi bên. Nút loa 🔊 cạnh nút thời điểm hoặc phím `T` để tắt / bật.
+- **Bản đồ nhỏ** góc phải: đảo, lộ trình, 5 điểm dừng, làng chài, cửa hang, vị trí thuyền (tam giác
+  trắng) và người xem (chấm xanh + hướng nhìn). Phím `B` ẩn / hiện.
+- **Chụp ảnh**: phím `P` lưu khung hình hiện tại thành file PNG (không dính các bảng HUD).
 
 ## Thời điểm trong ngày
 
@@ -47,6 +64,10 @@ Bản đồ trong mô hình là **minh họa**: vị trí các điểm không đ
 | `Space` / `C` | Bay lên / hạ xuống (chế độ Tự do) |
 | `N` | Thuyền rời điểm dừng ngay, không chờ hết giờ |
 | `1` `2` `3` | Ngày / Hoàng hôn / Đêm |
+| Bấm chuột vào biểu tượng **i** | Mở bảng thuyết minh (bấm vào bảng / `Esc` để đóng) |
+| `P` | Chụp ảnh, lưu file PNG |
+| `T` | Tắt / bật âm thanh |
+| `B` | Ẩn / hiện bản đồ nhỏ |
 | `H` | Ẩn / hiện bảng hướng dẫn |
 
 Góc dưới bên trái là bảng **FPS · Draw call · Tam giác** để tự kiểm tra hiệu năng
@@ -61,8 +82,8 @@ Ghi chú:
 - Phím `F` (mặc định của A-Frame để vào VR) đã được tắt: trên máy không có kính, nó chỉ làm
   khung 3D toàn màn hình và che mất các bảng thông tin.
 - Nút kính VR ở góc phải chỉ hiện khi trình duyệt hỗ trợ WebXR "immersive-vr" (có kính VR).
-- Bảng điểm dừng chỉ hiện ở chế độ Du thuyền; khi đeo kính, bảng HTML không hiển thị
-  (Mốc 4 sẽ có bảng thuyết minh 3D trong không gian).
+- Bảng điểm dừng chỉ hiện ở chế độ Du thuyền; khi đeo kính, bảng HTML không hiển thị nên
+  dùng bảng thuyết minh 3D trong không gian thay thế.
 
 ## Cấu trúc thư mục
 
@@ -80,8 +101,11 @@ WebVR-HaLong/
     ├── lang-chai.js    làng chài nổi: nhà bè, lối đi, lồng bè, lưới, thuyền nhỏ, đèn lồng (1 texture atlas)
     ├── hang-dong.js    hang Sửng Sốt: khoét cửa vòm vào đảo Bồ Hòn, đường hầm + khoang, nhũ đá, đèn màu
     ├── sinh-vat.js     đàn hải âu (boids, vỗ cánh trong shader) + đom đóm ban đêm
+    ├── diem-thong-tin.js biểu tượng "i" bấm được + bảng thuyết minh 3D chữ vẽ bằng canvas
+    ├── am-thanh.js     âm thanh procedural (Web Audio): sóng, gió, hải âu, dế, giọt nước + vang hang
     ├── dieu-khien.js   2 chế độ: đứng trên boong / bay tự do (WASD, chuột, va chạm, bay vào hang)
-    └── giao-dien.js    HUD: hướng dẫn, chip chế độ, bảng điểm dừng, nút Ngày/Hoàng hôn/Đêm, FPS / draw call
+    └── giao-dien.js    HUD: màn hình chờ, hướng dẫn, chip + nút Vào hang, bảng điểm dừng,
+                        nút thời điểm + loa, bản đồ nhỏ, chụp ảnh, FPS / draw call
 ```
 
 ## Tiến độ
@@ -89,6 +113,6 @@ WebVR-HaLong/
 - [x] **Mốc 1**: khung dự án, biển, bầu trời, vài đảo, điều khiển WASD/chuột
 - [x] **Mốc 2**: đảo đá vôi procedural đầy đủ, thuyền buồm, du thuyền tự động theo lộ trình
 - [x] **Mốc 3**: làng chài, hang động, sinh vật, chu kỳ ngày/đêm
-- [ ] Mốc 4: hotspot thông tin, HUD, minimap, âm thanh, màn hình chờ, chụp ảnh
+- [x] **Mốc 4**: hotspot thông tin, HUD, minimap, âm thanh, màn hình chờ, chụp ảnh
 - [ ] Mốc 5: WebXR (tay cầm, teleport, snap turn), điện thoại, tối ưu, chế độ chất lượng
 - [ ] Mốc 6: README đầy đủ + BAO_CAO.md
