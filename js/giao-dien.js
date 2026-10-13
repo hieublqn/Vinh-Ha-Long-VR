@@ -48,7 +48,7 @@
         '<li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Ngày / Hoàng hôn / Đêm</li>',
         '<li><b>Bấm biểu tượng i</b> để đọc thuyết minh</li>',
         '<li><kbd>P</kbd> chụp ảnh · <kbd>T</kbd> tiếng · <kbd>B</kbd> bản đồ</li>',
-        '<li><kbd>H</kbd> ẩn / hiện bảng này</li>',
+        '<li><kbd>Q</kbd> đồ hoạ Cao / Thấp · <kbd>H</kbd> ẩn bảng này</li>',
         '</ul>'
       ].join('');
       document.body.appendChild(this.bangHuongDan);
