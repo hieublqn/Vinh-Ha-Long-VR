@@ -34,32 +34,36 @@
       [0, 80], [14, 15], [30, -60], [5, -140], [-90, -190],
       [-175, -150], [-210, -40], [-185, 60], [-120, 110], [-55, 120]
     ],
+    // Lời giới thiệu ngắn ở mỗi điểm dừng. Nội dung đã đối chiếu nguồn (chi tiết + nguồn ở
+    // bảng thuyết minh trong diem-thong-tin.js).
     diemDung: [
       {
         chiSo: 0, ten: 'Vịnh Hạ Long',
-        moTa: 'Di sản Thiên nhiên Thế giới, được UNESCO ghi danh lần đầu năm 1994.'
+        moTa: 'Di sản thiên nhiên thế giới, được UNESCO ghi danh năm 1994 (thẩm mỹ) và năm 2000 (địa chất, địa mạo).'
       },
       {
         chiSo: 2, ten: 'Đảo Ti Tốp',
-        // TODO cần kiểm tra: năm 1962 và chi tiết chuyến thăm của nhà du hành Gherman Titov
-        moTa: 'Đảo mang tên nhà du hành vũ trụ Gherman Titov. Có bãi cát nhỏ và đỉnh ngắm toàn cảnh vịnh.',
+        // Nguồn: Báo Quảng Ninh, quangninh.gov.vn – chuyến thăm ngày 22/1/1962
+        moTa: 'Đảo mang tên nhà du hành vũ trụ Liên Xô Gherman Titov, người cùng Bác Hồ thăm vịnh năm 1962. ' +
+          'Có bãi tắm hình vầng trăng và đỉnh ngắm toàn cảnh vịnh.',
         vatThe: { loai: 'ti-top', x: -30, z: -100, banKinh: 26 }
       },
       {
         chiSo: 4, ten: 'Hang Sửng Sốt',
-        moTa: 'Hang động rộng và đẹp bậc nhất vịnh, nằm trên đảo Bồ Hòn.',
+        moTa: 'Một trong những hang động rộng và đẹp nhất vịnh, nằm trên đảo Bồ Hòn.',
         vatThe: { loai: 'bo-hon', x: -168, z: -260, banKinh: 62 }
       },
       {
         chiSo: 6, ten: 'Làng chài Cửa Vạn',
-        // TODO cần kiểm tra: năm tái định cư (2014) và số hộ còn ở lại trên vịnh
-        moTa: 'Làng chài trên vịnh nổi tiếng nhất Hạ Long. Từ năm 2014 phần lớn ngư dân đã lên bờ ' +
-          'tái định cư; một số nhà bè được giữ lại để bảo tồn văn hóa làng chài và đón khách.',
+        // Nguồn: Tuổi Trẻ, Thanh Tra (2012), quyết định di dời 6/2014 của tỉnh Quảng Ninh.
+        // TODO cần kiểm tra: số hộ còn ở lại trên vịnh hiện nay (không đưa con số vào)
+        moTa: 'Làng chài nổi giữa vịnh, năm 2012 được xếp vào 16 làng cổ đẹp nhất thế giới. Từ năm 2014 phần lớn ' +
+          'ngư dân lên bờ tái định cư; một số nhà bè được giữ lại để bảo tồn văn hóa làng chài và đón khách.',
         vatThe: { loai: 'lang-chai', x: -268, z: -22, banKinh: 58 }
       },
       {
         chiSo: 8, ten: 'Hòn Gà Chọi',
-        moTa: 'Hai hòn đá nhỏ đứng đối mặt nhau như đôi gà đang chọi, một biểu tượng của Hạ Long.',
+        moTa: 'Hai khối đá vôi đứng đối mặt nhau như đôi gà trống mái, hình ảnh được dùng trên logo vịnh Hạ Long.',
         vatThe: { loai: 'ga-choi', x: -142, z: 147, banKinh: 14 }
       }
     ]

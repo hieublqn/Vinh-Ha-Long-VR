@@ -59,41 +59,69 @@
         'Bác đề nghị lấy tên Titov đặt cho đảo để ghi nhớ chuyến thăm. Đảo có bãi tắm hình vầng trăng khuyết ôm lấy chân núi. ' +
         'Leo hàng trăm bậc thang lên đỉnh, du khách được ngắm toàn cảnh vịnh từ đài vọng cảnh.'
     },
+    // Nguồn: Ban quản lý vịnh Hạ Long (halongbay.com.vn/places/28-hang-sung-sot), Vietnam News,
+    // Thanh Niên ("nhà hát opera" trong hang), Tuổi Trẻ / Báo Quảng Ninh (ngựa, gươm Thánh Gióng).
+    // TODO cần kiểm tra: năm 1901 và người đặt tên (có nguồn ghi "thế kỷ 19"); tên Pháp viết
+    // 2 kiểu (Grotte des Surprises / de la surprise); số ngăn hang (2, 3 hay 4) → không đưa vào.
     'hang-sung-sot': {
       tieuDe: 'Hang Sửng Sốt',
-      noiDung: 'Hang Sửng Sốt nằm trên đảo Bồ Hòn, là một trong những hang động rộng và đẹp nhất vịnh Hạ Long. ' +
-        'Hang được người Pháp khám phá vào đầu thế kỷ 20 và đặt tên "Hang Những Điều Bất Ngờ". ' +
-        'Bên trong có nhiều khối thạch nhũ, măng đá với hình thù lạ mắt.',
+      noiDung: 'Hang Sửng Sốt nằm trên đảo Bồ Hòn, giữa vịnh Hạ Long. Theo nhiều tài liệu, người Pháp đến đây năm 1901 và gọi hang là “Grotte des Surprises”, tức hang của sự ngạc nhiên. ' +
+        'Hang rộng hơn 10.000 mét vuông, ngăn đầu được ví như một nhà hát lớn. ' +
+        'Nhũ đá tạo nhiều hình thù, như con ngựa và thanh gươm gắn với truyền thuyết Thánh Gióng. ' +
+        'Lối đi lát đá cùng hệ thống đèn nhiều màu giúp du khách ngắm hang dễ dàng.',
       hanhDong: { nhan: 'Vào hang ▸', ham: 'vaoHang' }
     },
+    // Nguồn: US National Park Service (nps.gov – speleothems), Wikipedia "Stalactite", EBSCO.
+    // TODO cần kiểm tra: 0,1 mm/năm chỉ là giá trị điển hình toàn cầu (0,1–0,25 mm/năm, nơi nhanh
+    // nhất ~3 mm/năm); chưa có số đo riêng cho hang ở vịnh Hạ Long.
     'nhu-da': {
       tieuDe: 'Thạch nhũ và măng đá',
-      noiDung: 'Nước mưa ngấm qua đá vôi mang theo canxi cacbonat hoà tan. Khi nhỏ giọt trong hang, nước mất bớt khí CO2 nên đá vôi kết tủa lại từng lớp rất mỏng. ' +
-        'Thạch nhũ rủ xuống từ trần, măng đá mọc lên từ nền; hai khối nối nhau thành cột đá. Chúng lớn rất chậm, thường chỉ vài milimét mỗi trăm năm đến mỗi năm.',
+      noiDung: 'Nước mưa thấm qua đất, hấp thụ thêm CO2 nên có tính axit yếu và hòa tan canxi cacbonat (CaCO3) trong đá vôi. ' +
+        'Khi nước rỉ ra ở trần hang, CO2 thoát vào không khí khiến CaCO3 kết tủa thành từng lớp mỏng. ' +
+        'Thạch nhũ treo rủ từ trần xuống, măng đá mọc từ nền lên; khi hai khối nối liền sẽ thành cột đá. ' +
+        'Chúng lớn rất chậm, thường chỉ khoảng 0,1 mm mỗi năm, nên một khối lớn cần hàng nghìn năm.',
       hanhDong: { nhan: 'Ra khỏi hang ▸', ham: 'raKhoiHang' }
     },
+    // Nguồn: Ban quản lý vịnh Hạ Long (Trung tâm văn hoá nổi Cửa Vạn), Tuổi Trẻ, Thanh Tra (2012),
+    // Báo Quảng Ninh (176 hộ), VOV5, Tạp chí ĐH Hải Phòng (quyết định di dời 6/2014).
+    // TODO cần kiểm tra: số hộ không thống nhất (167–176, có nơi > 200) → "gần 200 hộ"; trung tâm
+    // văn hoá nổi tạm dừng đón khách từ 25/4/2024 (bão Yagi 9/2024) → viết thì quá khứ "ra đời".
     'cua-van': {
       tieuDe: 'Làng chài Cửa Vạn',
-      noiDung: 'Cửa Vạn là một trong những làng chài nổi lớn và nổi tiếng nhất trên vịnh Hạ Long. ' +
-        'Ngư dân sống trên nhà bè, đánh bắt và nuôi hải sản qua nhiều thế hệ. ' +
-        'Khoảng năm 2014, phần lớn các hộ đã chuyển lên bờ định cư; làng nay chủ yếu phục vụ tham quan, giữ lại nét văn hoá làng chài.'
+      noiDung: 'Cửa Vạn là làng chài nổi giữa vịnh Hạ Long, cách cảng tàu du lịch khoảng 20 km. ' +
+        'Năm 2012, trang Journeyetc.com đưa Cửa Vạn vào danh sách 16 làng cổ đẹp nhất thế giới. ' +
+        'Làng từng có gần 200 hộ ngư dân; từ năm 2014, phần lớn chuyển lên bờ để bảo vệ di sản. ' +
+        'Năm 2006, Trung tâm văn hóa nổi Cửa Vạn ra đời để giới thiệu đời sống ngư dân. Du khách thường ngồi đò hoặc chèo kayak thăm làng.'
     },
+    // Nguồn: World Monuments Fund (4 làng chài cổ), VietnamNet, Vietnam News, Thanh Tra, VOV,
+    // Dân Trí (lớp học nổi). Bỏ "câu mực đêm", "thúng chai" vì chỉ có trang du lịch nêu.
     'nuoi-ca': {
       tieuDe: 'Đời sống trên nhà bè',
-      noiDung: 'Người dân làng chài nuôi cá trong lồng bè làm bằng khung gỗ, phao nổi và lưới thả dưới nước. ' +
-        'Họ đi lại giữa các nhà bằng thuyền nan, thuyền thúng chèo tay. ' +
-        'Ở Cửa Vạn từng có lớp học nổi để trẻ em làng chài đi học ngay trên mặt nước.'
+      noiDung: 'Nhiều ngư dân vịnh Hạ Long từng sống trên nhà bè, hợp thành các làng chài nổi như Cửa Vạn, Ba Hang. ' +
+        'Họ thả lưới, buông câu và nuôi cá trong lồng bè cạnh nhà. Thuyền nan chèo tay là phương tiện đi lại quen thuộc giữa các nhà bè. ' +
+        'Làng Cửa Vạn từng có lớp học nổi cho trẻ em. ' +
+        'Từ năm 2014, phần lớn hộ dân được đưa lên bờ, một số nhà bè được giữ lại phục vụ du lịch.'
     },
+    // Nguồn: vietnam.travel, Nhân Dân ("Những kỳ quan trên vịnh Hạ Long"), Báo Văn Hoá (khảo sát của
+    // Viện Khoa học Địa chất và Khoáng sản), Pháp Luật, Người Quan Sát (8/2023).
+    // TODO cần kiểm tra: chiều cao (10 / 12 / 13,9 m) → "hơn 10 mét"; quy định giảm tốc còn hiệu lực?
+    // Lưu ý: tờ 200.000 đồng in hòn Đỉnh Hương, KHÔNG phải hòn Gà Chọi.
     'ga-choi': {
-      tieuDe: 'Hòn Gà Chọi',
-      noiDung: 'Hòn Gà Chọi, còn gọi là hòn Trống Mái, gồm hai khối đá nhỏ đứng đối mặt nhau giữa biển, trông như đôi gà đang chọi nhau. ' +
-        'Đây là một trong những hình ảnh quen thuộc, gần như biểu tượng của vịnh Hạ Long.'
+      tieuDe: 'Hòn Gà Chọi (Trống Mái)',
+      noiDung: 'Hòn Gà Chọi, còn gọi là hòn Trống Mái, gồm hai khối đá vôi đứng đối diện nhau như một đôi gà trống mái. ' +
+        'Cụm đá cao hơn 10 mét, chân hẹp hơn thân nên trông rất chênh vênh. Hình ảnh đôi gà đá được dùng trên logo vịnh Hạ Long. ' +
+        'Do sóng và thủy triều bào mòn chân đá, Quảng Ninh đã nghiên cứu giải pháp bảo tồn và yêu cầu tàu thuyền giảm tốc, giữ khoảng cách khi đi qua.'
     },
+    // Nguồn: Báo Văn Hoá, VTC News, Vietnam News ("Red Hạ Long sails revive forgotten craft"),
+    // VnExpress, Thanh Niên, VOV (vỏ cây đâng), Dân Trí / VietnamPlus (phục dựng 2026).
+    // TODO cần kiểm tra: chi tiết nan tre trên buồm (chủ yếu theo Vietnam News); thuyền phục dựng
+    // còn chạy ở thời điểm xem không. Mô hình trong cảnh là thuyền du lịch dáng buồm cánh dơi nâu.
     'thuyen-buom': {
       tieuDe: 'Thuyền buồm nâu',
-      noiDung: 'Thuyền buồm truyền thống trên vịnh có những cánh buồm màu nâu, căng trên các thanh tre ngang nên trông giống cánh dơi. ' +
-        'Màu nâu đến từ cách nhuộm vải bằng củ nâu giúp buồm bền hơn khi gặp nắng gió, nước mặn. ' +
-        'Ngày nay nhiều tàu du lịch vẫn giữ dáng buồm này.'
+      noiDung: 'Thuyền ba vách là thuyền buồm truyền thống từng quen thuộc trên vịnh Hạ Long, thân ghép từ ba tấm ván. ' +
+        'Thuyền có hai cánh buồm hình cánh dơi căng trên các nan tre, có thể chạy ngược gió. ' +
+        'Ngày xưa, buồm được nhuộm bằng củ nâu và vỏ cây đâng ở rừng ngập mặn để bền trước nắng gió, nước mặn và có sắc nâu đặc trưng. ' +
+        'Năm 2026, loại thuyền này được phục dựng để chở du khách, nhưng dùng buồm đỏ.'
     }
   };
 
@@ -318,6 +346,8 @@
       }
       ctx.fillStyle = '#fdf3e7';
       dong.forEach(function (d, i) { ctx.fillText(d, le, dinh + i * co * 1.42); });
+      // ghi lại để tự kiểm tra: cỡ chữ đã chọn, số dòng, có bị tràn khung không
+      this.thongTinVe = { co: co, soDong: dong.length, tran: dong.length * co * 1.42 > day - dinh };
       // Chân bảng: gợi ý đóng + nút hành động
       ctx.fillStyle = 'rgba(243, 201, 160, 0.85)';
       ctx.font = '400 24px ' + FONT;
