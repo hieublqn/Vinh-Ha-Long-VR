@@ -452,9 +452,14 @@ body.cam-ung .a-canvas { touch-action: none; }
   body.dang-thuyet-minh #chip-che-do { opacity: 0.3; }
 }
 
-/* Màn hẹp (điện thoại dọc, cửa sổ hẹp): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm.
-   Mốc 5 thêm nút ⚙ làm cụm nút thời điểm rộng ~330px → dưới ~680px là đè bảng hướng dẫn */
+/* Cửa sổ hẹp: cụm nút thời điểm (thêm nút ⚙ ở Mốc 5) rộng ~330px → dưới ~680px là đè bảng
+   hướng dẫn ở góc trái trên → dời bảng xuống dưới cụm nút (giữ bề rộng để bảng không dài ra) */
 @media (max-width: 700px) {
+  #bang-huong-dan { top: 64px; }
+}
+
+/* Màn hẹp (điện thoại dọc): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm */
+@media (max-width: 600px) {
   #bang-huong-dan {
     top: 64px;
     max-width: 200px;
