@@ -9,23 +9,29 @@
  *     → thành tiếng hải âu, côn trùng, giọt nước.
  * Nhờ vậy chạy được cả khi mở thẳng file:// (không phải tải gì).
  *
- *   1. Khởi động: trình duyệt CHẶN phát tiếng khi người dùng chưa bấm/chạm gì
- *      → chỉ tạo AudioContext trong HALONG.amThanh.batDau() (nút "Bắt đầu").
+ *   1. Nhớ lựa chọn tắt tiếng (localStorage).
  *   2. Bộ đệm tạo 1 lần: nhiễu hồng, nhiễu nâu, xung vang của hang, nhịp kêu
- *      của côn trùng. Phát LẶP mãi → không phải sinh nhiễu mỗi khung hình.
- *   3. Sơ đồ nối dây (đồ thị node):
+ *      côn trùng. Phát LẶP mãi → không phải sinh nhiễu mỗi khung hình.
+ *   3. Tiện ích tạo node (bộ lọc, gain, panner 3D, "núm vặn" trượt mượt).
+ *   4. Dựng đồ thị node (1 lần). Các lớp chạy liên tục:
+ *        a) sóng biển + bọt sóng   b) nước vỗ mạn thuyền   c) gió
+ *        d) côn trùng ban đêm (3 giọng)   e) hang: vang + tiếng ù trầm
+ *      Sơ đồ nối dây:
  *        sóng, bọt sóng, nước vỗ, gió, côn trùng, hải âu
  *            → [lọc + âm lượng NGOÀI TRỜI] ──┐   (vào hang: nghe bị bóp nghẹt)
  *        giọt nước, vang, tiếng ù hang        │
  *            → [nhánh HANG] (chỉ nối khi gần) ┤
  *                                             └→ trộn → nén → âm lượng tổng → loa
- *   4. Sóng biển   5. Nước vỗ mạn thuyền   6. Gió
- *   7. Hải âu: tiếng kêu ngắn, có hướng 3D (PannerNode) tại vị trí 1 con chim
- *   8. Côn trùng ban đêm: 3 giọng dế đặt quanh bờ đảo / làng chài gần nhất
- *   9. Hang động: giọt nước rơi + tiếng vang (ConvolverNode) + tiếng ù trầm
- *  10. Tắt tiếng (nhớ trong localStorage), tạm dừng khi chuyển tab
- *  11. Component: vị trí/hướng TAI người nghe cập nhật mỗi khung hình;
- *      các tham số khác chỉ 10 lần/giây (máy yếu Core i3 vẫn nhẹ)
+ *   5. Hải âu: tiếng kêu ngắn, có hướng 3D (PannerNode) tại vị trí 1 con chim.
+ *   6. Giọt nước trong hang: tiếng ngắn có hướng 3D + vang (ConvolverNode).
+ *   7. Bờ đảo / làng chài gần nhất → chỗ đặt côn trùng.
+ *   8. Tai người nghe: vị trí + hướng nhìn, cập nhật MỖI khung hình.
+ *   9. Tham số chậm (âm lượng, bộ lọc, hẹn giờ tiếng ngắn): chỉ 10 lần/giây
+ *      → máy yếu (Core i3) vẫn nhẹ.
+ *  10. Tắt tiếng (nhỏ dần rồi cho bộ xử lý ngủ) + tạm dừng khi chuyển tab.
+ *  11. Khởi động: trình duyệt CHẶN phát tiếng khi người dùng chưa bấm/chạm gì
+ *      → chỉ tạo AudioContext trong HALONG.amThanh.batDau() (nút "Bắt đầu").
+ *  12. Component "am-thanh": tick() gọi mục 8 và 9.
  * ========================================================================= */
 (function () {
   'use strict';
@@ -38,7 +44,10 @@
   var TAU_TAT = 0.12;                  // setTargetAtTime: sau 3τ ≈ 0,36 s còn 5 % → "nhỏ dần ~0,4 s"
   var CHU_KY_CHAM = 100;               // ms – tham số chậm (âm lượng, bộ lọc...) cập nhật 10 lần/giây
   var R_GIOT = 45;                     // nghe giọt nước khi cách tâm khoang hang < 45 m
-  var R_NOI_HANG = 110, R_NGAT_HANG = 130;   // nối / ngắt cả nhánh hang (2 ngưỡng → không bật tắt liên tục ở mép)
+  // Nối / ngắt cả nhánh hang theo khoảng cách tới tâm khoang. Bộ vang (ConvolverNode) là phần
+  // nặng nhất (~3 lần cả phần ngoài trời) → chỉ nối khi sắp nghe được giọt nước (R_GIOT).
+  // 2 ngưỡng khác nhau → đứng ở mép không bị nối/ngắt liên tục.
+  var R_NOI_HANG = 60, R_NGAT_HANG = 75;
   var KHOANG = { rx: 15, ry: 9, rz: 13 };    // 3 bán trục khoang hang (≈ 30 × 18 × 26 m, khớp hang-dong.js)
 
   var A = null;          // toàn bộ đồ thị âm thanh + trạng thái (null = chưa bắt đầu / không có âm thanh)
@@ -51,7 +60,7 @@
   function goiAnToan(hua) { if (hua && hua.catch) hua.catch(boQua); }
 
   /* -----------------------------------------------------------------------
-   * 10a. NHỚ LỰA CHỌN TẮT TIẾNG
+   * 1. NHỚ LỰA CHỌN TẮT TIẾNG
    *      localStorage có thể bị chặn (chế độ riêng tư, mở file:// trên vài
    *      trình duyệt) → luôn bọc try/catch, lỗi thì coi như "chưa lưu gì".
    * --------------------------------------------------------------------- */
@@ -213,7 +222,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 3b. DỰNG ĐỒ THỊ (chạy 1 lần trong batDau)
+   * 4. DỰNG ĐỒ THỊ (chạy 1 lần trong batDau)
    * --------------------------------------------------------------------- */
   function dungDoThi(ctx) {
     var D = { ctx: ctx }, t0 = ctx.currentTime;
@@ -246,7 +255,7 @@
     D.nLocNgoai = taoNum(D.locNgoai.frequency, 5);
     D.nNgoai = taoNum(D.busNgoai.gain, 0.003);
 
-    // --- 4. SÓNG BIỂN: nhiễu nâu → lọc thông thấp → "phồng xẹp" theo 2 LFO chậm.
+    // --- a) SÓNG BIỂN: nhiễu nâu → lọc thông thấp → "phồng xẹp" theo 2 LFO chậm.
     // 2 LFO tần số lệch nhau (0,13 Hz và 0,071 Hz – không chia hết cho nhau) → tổng của
     // chúng không bao giờ lặp đều đặn, mỗi con sóng to nhỏ khác nhau như sóng thật.
     var nguonNau = taoNguonLap(ctx, nau, 1, 0);
@@ -276,7 +285,7 @@
     D.nBot = taoNum(D.mucBot.gain, 0.003);
     D.nSong = taoNum(D.mucSong.gain, 0.003);
 
-    // --- 5. NƯỚC VỖ MẠN THUYỀN: nhiễu hồng lọc dải 400–1000 Hz, âm lượng nhảy theo
+    // --- b) NƯỚC VỖ MẠN THUYỀN: nhiễu hồng lọc dải 400–1000 Hz, âm lượng nhảy theo
     // từng "cú vỗ" ngẫu nhiên. KHÔNG dùng panner: đứng trên boong thì nước vỗ cả 2 mạn,
     // bao quanh người nghe – đặt ở 1 điểm (tâm thuyền) lại nghe như phát ra sau lưng.
     var nguonVo = taoNguonLap(ctx, hong, 0.97, 1.7);
@@ -288,7 +297,7 @@
     D.nLocVo = taoNum(D.locVo.frequency, 5);
     D.nVo = taoNum(D.mucVo.gain, 0.002);
 
-    // --- 6. GIÓ: 1 nguồn nhiễu chia 2 bộ lọc dải:
+    // --- c) GIÓ: 1 nguồn nhiễu chia 2 bộ lọc dải:
     //   rít  : Q cao, tần số trung tâm lang thang 300–900 Hz → tiếng "hú" khi gió giật
     //   thổi : Q thấp quanh 350 Hz → tiếng ù rộng làm nền
     var nguonGio = taoNguonLap(ctx, hong, 1.03, 2.9);
@@ -303,7 +312,7 @@
     D.nQGio = taoNum(D.locRit.Q, 0.1);
     D.nGio = taoNum(D.mucGio.gain, 0.002);
 
-    // --- 8. CÔN TRÙNG: 3 giọng, mỗi giọng = dao động 3,8–5 kHz × nhịp kêu riêng
+    // --- d) CÔN TRÙNG: 3 giọng, mỗi giọng = dao động 3,8–5 kHz × nhịp kêu riêng
     // (chu kỳ, số xung, tốc độ phát khác nhau → không bao giờ kêu đồng loạt).
     // Cả nhánh chỉ được NỐI vào loa khi trời tối: ban ngày bộ xử lý không phải tính.
     D.busConTrung = taoGain(ctx, 0);
@@ -324,14 +333,14 @@
       nhip.playbackRate.value = ngauNhien(0.92, 1.08);
       nhip.connect(bao.gain);
       var muc = taoGain(ctx, 1);                 // dùng để tắt-dời-bật khi chuyển sang bờ khác
-      var pan = taoPanner(ctx, 'equalpower', 6);
+      var pan = taoPanner(ctx, 'equalpower', 8);
       osc.connect(bao); bao.connect(muc); muc.connect(pan); pan.connect(D.busConTrung);
       osc.start(t0);
       nhip.start(t0 + i * 0.17);
       return { pan: pan, muc: muc, x: 0, z: 0, daDat: false };
     });
 
-    // --- 9. HANG ĐỘNG: nhánh riêng, chỉ nối vào loa khi ở gần hang (bộ vang tốn CPU).
+    // --- e) HANG ĐỘNG: nhánh riêng, chỉ nối vào loa khi ở gần hang (bộ vang tốn CPU).
     D.busHang = taoGain(ctx, 1);
     D.noiHang = false;
     D.vang = ctx.createConvolver();
@@ -377,7 +386,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 7. HẢI ÂU – 1 tiếng kêu = 2–4 nốt "kéo... kéo..."
+   * 5. HẢI ÂU – 1 tiếng kêu = 2–4 nốt "kéo... kéo..."
    *    Dùng CHUNG 1 dao động cho mọi nốt trong 1 lần kêu (hẹn giờ cao độ + âm lượng
    *    từng nốt nối tiếp nhau) → mỗi lần kêu chỉ 4 node, kêu xong tự gỡ.
    *    Răng cưa có nhiều hoạ âm, qua lọc dải → giọng "the thé, khàn khàn" của hải âu.
@@ -386,7 +395,7 @@
     var ctx = A.ctx, t0 = ctx.currentTime + 0.05, t = t0;
     var osc = ctx.createOscillator();
     osc.type = 'sawtooth';
-    var loc = taoLoc(ctx, 'bandpass', ngauNhien(1700, 2200), 2.2);
+    var loc = taoLoc(ctx, 'bandpass', ngauNhien(1600, 2000), 1.6);
     var bao = taoGain(ctx, 0);
     var pan = taoPanner(ctx, 'HRTF', 8);
     var soNot = 2 + Math.floor(Math.random() * 3);
@@ -423,20 +432,20 @@
     A.thongKe.tiengHaiAu++;
   }
 
-  // Chọn 1 con hải âu để kêu: thử vài con ngẫu nhiên, ưu tiên con trong vòng 140 m
-  // (xa hơn thì nghe chẳng thấy, tạo node cũng phí); không có thì lấy con gần nhất < 220 m.
+  // Chọn 1 con hải âu để kêu: con GẦN NHẤT trong 6 con bốc ngẫu nhiên → thường là con đang
+  // lượn gần (nghe rõ) mà mỗi lần vẫn một hướng khác. Xa quá 160 m thì thôi: nghe chẳng
+  // thấy gì, tạo node chỉ phí CPU.
   function chonHaiAu(ds, p) {
-    var tot = null, kcTot = 220 * 220;
+    var tot = null, kcTot = 160 * 160;
     for (var k = 0; k < 6 && ds.length; k++) {
       var g = ds[Math.floor(Math.random() * ds.length)], kc2 = g.p.distanceToSquared(p);
-      if (kc2 < 140 * 140) return g;
       if (kc2 < kcTot) { kcTot = kc2; tot = g; }
     }
     return tot;
   }
 
   /* -----------------------------------------------------------------------
-   * 9b. GIỌT NƯỚC – sin tụt cao độ rất nhanh (~1400 → ~500 Hz trong 30–60 ms) + tắt nhanh:
+   * 6. GIỌT NƯỚC – sin tụt cao độ rất nhanh (~1400 → ~500 Hz trong 30–60 ms) + tắt nhanh:
    *     chính kiểu "tách/bõm" ngắn ta nghe khi giọt nước rơi trong hang.
    *     Tiếng khô đặt 3D gần trần khoang (rơi từ đầu nhũ đá); 1 phần gửi vào bộ vang.
    * --------------------------------------------------------------------- */
@@ -453,7 +462,7 @@
     osc.frequency.setValueAtTime(ngauNhien(1250, 1600), t0);
     osc.frequency.exponentialRampToValueAtTime(ngauNhien(430, 600), t0 + tg);
     var bao = taoGain(ctx, 0);
-    var dinh = muc * ngauNhien(0.35, 0.7);
+    var dinh = muc * ngauNhien(0.5, 0.9);
     bao.gain.setValueAtTime(0, t0);
     bao.gain.linearRampToValueAtTime(dinh, t0 + 0.003);
     bao.gain.setTargetAtTime(0, t0 + 0.004, ngauNhien(0.025, 0.055));
@@ -469,7 +478,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 8b. BỜ GẦN NHẤT (cho côn trùng + sóng vỗ bờ to hơn khi lại gần vách đảo)
+   * 7. BỜ GẦN NHẤT (cho côn trùng + sóng vỗ bờ to hơn khi lại gần vách đảo)
    *     Đảo là elip xoay (cùng quy ước với dieu-khien.js): đổi vị trí sang hệ riêng
    *     của đảo, q = "khoảng cách elip" (< 1 là trong đảo). Điểm (dx, dz)/q nằm đúng
    *     trên mép elip, cùng phương với người nghe → điểm bờ gần đúng, không cần lặp.
@@ -532,7 +541,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 11a. TAI NGƯỜI NGHE – mỗi khung hình
+   * 8. TAI NGƯỜI NGHE – mỗi khung hình
    *      Đọc thẳng ma trận thế giới của camera (cột 1 = hướng lên, -cột 2 = hướng
    *      nhìn, cột 3 = vị trí): không tạo vector, không tính lại ma trận cha.
    *      Ma trận có thể trễ 1 khung (~16 ms) – tai người không nhận ra.
@@ -561,7 +570,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 11b. THAM SỐ CHẬM – 10 lần/giây
+   * 9. THAM SỐ CHẬM – 10 lần/giây
    * --------------------------------------------------------------------- */
   function capNhatCham(giay) {
     var c = A.ctx.currentTime, p = A.viTri;
@@ -610,7 +619,7 @@
     var s = 0.55 + 0.28 * Math.sin(2 * Math.PI * 0.13 * tg) + 0.17 * Math.sin(2 * Math.PI * 0.071 * tg);
     vanNum(A.nLocSong, (480 + 420 * s) * (1 - 0.35 * thapCao), 0.15);
     vanNum(A.nBot, 0.6 * Math.max(0, s - 0.62) / 0.38 * (1 - thapCao), 0.15);
-    var ganBo = 1 - ss(8, 40, A.khoangCachBo);
+    var ganBo = (1 - ss(8, 40, A.khoangCachBo)) * (1 - kHang);   // trong hang (lòng đảo) thì không tính
     vanNum(A.nSong, 0.5 * (1 - 0.7 * thapCao) * (1 + 0.4 * ganBo), 0.6);
 
     // e) Nước vỗ mạn: chỉ nghe khi cách thuyền < ~25 m; to theo tốc độ thuyền.
@@ -667,7 +676,7 @@
       A.noiConTrung = false;
     }
     if (A.noiConTrung) {
-      vanNum(A.nConTrung, 0.32 * ss(0.45, 0.85, dem) * (1 - kHang), 0.5);
+      vanNum(A.nConTrung, 0.22 * ss(0.45, 0.85, dem) * (1 - kHang), 0.5);
       if (c >= A.ctTiep) {
         A.ctTiep = c + 3;
         datChoConTrung(c);
@@ -684,7 +693,7 @@
         A.noiHang = false;
       }
       if (A.noiHang) {
-        vanNum(A.nNenHang, 0.5 * kHang, 0.6);
+        vanNum(A.nNenHang, 0.3 * kHang, 0.6);
         vanNum(A.nGuiVangNgoai, 0.6 * kHang, 0.6);
         // Đứng ngoài cửa hang: tiếng giọt nước khô gần như mất, chỉ còn tiếng vang vọng ra
         vanNum(A.nVang, 0.35 + 0.45 * kHang, 0.6);
@@ -711,7 +720,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 10b. TẮT TIẾNG + CHUYỂN TAB
+   * 10. TẮT TIẾNG + CHUYỂN TAB
    * --------------------------------------------------------------------- */
   function layScene() {
     var el = thanhPhan ? thanhPhan.el.sceneEl : document.querySelector('a-scene');
@@ -751,7 +760,7 @@
   }
 
   /* -----------------------------------------------------------------------
-   * 1. KHỞI ĐỘNG – gọi từ nút "Bắt đầu" (thao tác của người dùng)
+   * 11. KHỞI ĐỘNG – gọi từ nút "Bắt đầu" (thao tác của người dùng)
    * --------------------------------------------------------------------- */
   function batDau() {
     if (A) {
@@ -760,10 +769,10 @@
       return;
     }
     if (daHong) return;
+    var ctx = null;
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) { daHong = true; return; }
-      var ctx;
       // 'playback': bộ đệm âm thanh lớn hơn → luồng âm thanh ít phải thức dậy hơn, ít bị
       // vấp khi CPU đang bận vẽ 3D. Âm thanh môi trường không cần độ trễ thấp.
       try { ctx = new Ctx({ latencyHint: 'playback' }); } catch (e) { ctx = new Ctx(); }
@@ -783,8 +792,9 @@
     } catch (e) {
       // Lỗi gì cũng chỉ mất tiếng, khung cảnh vẫn chạy bình thường
       daHong = true;
-      if (A && A.ctx) goiAnToan(A.ctx.close());
       A = null;
+      document.removeEventListener('visibilitychange', khiDoiTab);
+      try { if (ctx && ctx.close) goiAnToan(ctx.close()); } catch (e2) { /* bỏ qua */ }
       api.ctx = api.tongRa = api.doThi = null;
       console.warn('Âm thanh: không khởi tạo được Web Audio –', e);
     }
@@ -815,7 +825,7 @@
   };
 
   /* -----------------------------------------------------------------------
-   * 11. COMPONENT – gắn vào <a-entity am-thanh>; chưa batDau thì không làm gì
+   * 12. COMPONENT – gắn vào <a-entity am-thanh>; chưa batDau thì không làm gì
    * --------------------------------------------------------------------- */
   AFRAME.registerComponent('am-thanh', {
     init: function () {

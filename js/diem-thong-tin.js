@@ -28,22 +28,36 @@
 
   /* ---------- Nội dung thuyết minh ---------- */
   var THUYET_MINH = {
+    // Nguồn: Ban quản lý vịnh Hạ Long (halongbay.com.vn), UNESCO whc.unesco.org/en/list/672,
+    // Tuổi Trẻ (30 năm di sản), Bộ VHTTDL (mở rộng 2023).
+    // TODO cần kiểm tra: 1.553 km² / 1.969 đảo là số của Ban quản lý cho toàn vịnh; UNESCO ghi
+    // "hơn 1.600 đảo" cho vùng di sản. Muốn an toàn tuyệt đối thì đổi thành "gần 2.000 hòn đảo".
     'vinh-ha-long': {
       tieuDe: 'Vịnh Hạ Long',
-      noiDung: 'Vịnh Hạ Long thuộc tỉnh Quảng Ninh, nằm ở bờ Tây vịnh Bắc Bộ, với hàng nghìn hòn đảo đá vôi lớn nhỏ. ' +
-        'Vịnh được UNESCO công nhận là Di sản Thiên nhiên Thế giới, nhờ vẻ đẹp cảnh quan và giá trị địa chất. ' +
-        'Tên "Hạ Long" có nghĩa là "rồng đáp xuống", gắn với truyền thuyết rồng hạ xuống giúp dân đánh giặc.'
+      noiDung: 'Vịnh Hạ Long thuộc Quảng Ninh, nằm trong vịnh Bắc Bộ, rộng 1.553 km² với 1.969 hòn đảo. ' +
+        'Hạ Long nghĩa là rồng đáp xuống: truyền thuyết kể rồng mẹ cùng đàn con xuống giúp người Việt đánh giặc, nhả ngọc hóa thành đảo đá. ' +
+        'UNESCO công nhận vịnh là Di sản thiên nhiên thế giới năm 1994 về giá trị thẩm mỹ, năm 2000 về địa chất, địa mạo. ' +
+        'Năm 2023, di sản mở rộng thành Vịnh Hạ Long – Quần đảo Cát Bà.'
     },
+    // Nguồn: hồ sơ UNESCO (whc.unesco.org/document/154005), NASA Earth Observatory, Ban quản lý
+    // vịnh Hạ Long, báo Nhân Dân. TODO cần kiểm tra: tuổi chính xác của đá vôi (Carbon – Permi,
+    // NASA ghi 390–260 triệu năm) và độ cao mực nước biển dâng → panel chỉ nói chung.
     'da-voi': {
       tieuDe: 'Đảo đá vôi và địa hình karst',
-      noiDung: 'Các đảo ở đây là đá vôi hình thành từ trầm tích biển hàng trăm triệu năm trước. ' +
-        'Nước mưa có tính axit nhẹ hoà tan đá vôi qua hàng triệu năm, tạo nên địa hình karst với vách dựng đứng, hang động. ' +
-        'Khi mực nước biển dâng lên sau thời kỳ băng hà, vùng đồi đá vôi bị nhấn chìm, chỉ còn các đỉnh nhô lên thành đảo.'
+      noiDung: 'Vùng vịnh có lịch sử địa chất hơn 500 triệu năm, với những tầng đá vôi rất dày. ' +
+        'Suốt khoảng 20 triệu năm, trong khí hậu nóng ẩm, nước mưa hòa tan đá vôi, tạo nên các cụm đỉnh hình nón (fengcong) và tháp đá riêng lẻ (fenglin). ' +
+        'Sau thời kỳ băng hà cuối, nước biển dâng nhấn chìm vùng karst, chỉ còn các đỉnh núi nhô lên thành đảo. ' +
+        'Sóng biển khoét vào chân đảo, tạo nên những ngấn biển hình hàm ếch.'
     },
+    // Nguồn: Báo Quảng Ninh (60 năm Bác Hồ và Ghéc-man Ti-tốp thăm vịnh), quangninh.gov.vn,
+    // halongbay.com.vn. Ngày 22/1/1962 theo các nguồn chính thức của Quảng Ninh.
+    // TODO cần kiểm tra: tên cũ Cát Nàng (gần như chỉ Báo Quảng Ninh nêu); số bậc lên đỉnh
+    // không thống nhất (400–450) → chỉ ghi "hàng trăm bậc".
     'ti-top': {
       tieuDe: 'Đảo Ti Tốp',
-      noiDung: 'Đảo mang tên nhà du hành vũ trụ Liên Xô Gherman Titov, người đã đến thăm nơi đây cùng Chủ tịch Hồ Chí Minh. ' +
-        'Đảo có bãi tắm cát trắng hình vầng trăng và lối đi bộ lên đỉnh để ngắm toàn cảnh vịnh.'
+      noiDung: 'Đảo Ti Tốp từng có tên là Cát Nàng. Ngày 22/1/1962, Chủ tịch Hồ Chí Minh cùng nhà du hành vũ trụ Liên Xô Gherman Titov thăm vịnh Hạ Long và lên đảo. ' +
+        'Bác đề nghị lấy tên Titov đặt cho đảo để ghi nhớ chuyến thăm. Đảo có bãi tắm hình vầng trăng khuyết ôm lấy chân núi. ' +
+        'Leo hàng trăm bậc thang lên đỉnh, du khách được ngắm toàn cảnh vịnh từ đài vọng cảnh.'
     },
     'hang-sung-sot': {
       tieuDe: 'Hang Sửng Sốt',
