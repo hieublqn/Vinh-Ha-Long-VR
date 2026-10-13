@@ -10,7 +10,7 @@ Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng c
 |---|---|---|
 | Nhấp đúp | Mở `index.html` bằng Chrome / Edge | Chạy qua `file://`, không cần cài gì |
 | VS Code Live Server | Chuột phải `index.html` → *Open with Live Server* | Địa chỉ `http://127.0.0.1:5500` |
-| Kính VR (Meta Quest) | Đưa thư mục lên GitHub Pages (https) rồi mở bằng trình duyệt của kính | WebXR chỉ chạy trên `https://` hoặc `localhost` |
+| Kính VR (Meta Quest) | Bật GitHub Pages cho repo (Settings → Pages → nhánh `main`, thư mục `/ (root)`) rồi mở `https://hieublqn.github.io/Vinh-Ha-Long-VR/` bằng trình duyệt của kính | WebXR chỉ chạy trên `https://` hoặc `localhost` |
 
 Cần trình duyệt có **WebGL2** (Chrome, Edge, Firefox bản mới). Máy không hỗ trợ (card đồ hoạ quá cũ,
 driver lỗi, bị chặn) thì màn hình chờ sẽ báo lỗi rõ ràng thay vì đứng ở "Đang dựng…".
@@ -142,7 +142,7 @@ Nút **⚙ Cao / ⚙ Thấp** ở cụm nút thời điểm (hoặc phím `Q`):
 ## Cấu trúc thư mục
 
 ```
-WebVR-HaLong/
+Vinh-Ha-Long-VR/
 ├── index.html          khung cảnh chính, nạp các file js
 ├── lib/aframe.min.js   A-Frame 1.6.0 (bản local, thiếu thì tự tải từ CDN)
 ├── css/style.css       giao diện HUD
