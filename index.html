@@ -66,6 +66,25 @@
       </ul>
     </div>
   </div>
+  <script>
+    // Máy không tạo được WebGL2 (card đồ hoạ cũ, driver lỗi, bị chặn bởi chính sách máy trường)
+    // → A-Frame dừng ngay lúc tạo renderer, giao-dien.js không chạy → báo lỗi rõ ràng thay vì
+    // để "Đang dựng…" mãi. Chỉ báo khi nút Bắt đầu chưa bật (đã bật = cảnh đã chạy được).
+    (function () {
+      var trangThai = document.getElementById('mhc-trang-thai'), nut = document.getElementById('nut-bat-dau');
+      var LOI_WEBGL = 'Trình duyệt hoặc card đồ hoạ không hỗ trợ WebGL2. Hãy cập nhật trình duyệt / driver card đồ hoạ, hoặc thử Chrome / Edge bản mới.';
+      function baoLoi(chu) {
+        if (!nut.disabled) return;
+        trangThai.textContent = chu;
+        trangThai.classList.add('loi');
+      }
+      var thu = document.createElement('canvas');
+      if (!(thu.getContext && thu.getContext('webgl2'))) baoLoi(LOI_WEBGL);
+      window.addEventListener('error', function (e) { if (/WebGL/i.test(e.message || '')) baoLoi(LOI_WEBGL); });
+      // Quá 90 giây vẫn chưa vẽ được khung hình đầu → có lỗi khác
+      setTimeout(function () { baoLoi('Không dựng được khung cảnh. Hãy tải lại trang hoặc thử trình duyệt khác.'); }, 90000);
+    })();
+  </script>
 
   <!--
     renderer:

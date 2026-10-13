@@ -552,7 +552,8 @@
 
       this.khiNhanPhim = function (e) {
         // N: rời điểm dừng ngay, không chờ hết giờ
-        if (e.code === 'KeyN' && this.trangThai === 'dung' && !HALONG.boQuaPhimTat(e)) this.cho = 0;
+        // (chỉ sau khi đã bấm Bắt đầu: không cho thuyền rời bến sau màn hình chờ)
+        if (e.code === 'KeyN' && this.trangThai === 'dung' && HALONG.daBatDau !== false && !HALONG.boQuaPhimTat(e)) this.cho = 0;
       }.bind(this);
       window.addEventListener('keydown', this.khiNhanPhim);
 

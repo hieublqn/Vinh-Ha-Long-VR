@@ -318,6 +318,7 @@
     D.busConTrung = taoGain(ctx, 0);
     D.nConTrung = taoNum(D.busConTrung.gain, 0.002);
     D.noiConTrung = false;
+    D.lucSangCT = 0;                 // thời điểm trời sáng (để ngắt nhánh côn trùng sau khi nhỏ dần)
     D.conTrung = [
       { tanSo: 4600, loai: 'sine', chuKy: 0.55, soXung: 3, nhip: 30 },       // dế: "rích-rích-rích"
       { tanSo: 4150, loai: 'sine', chuKy: 0.83, soXung: 4, nhip: 27 },       // dế khác loài, chậm hơn
@@ -343,6 +344,7 @@
     // --- e) HANG ĐỘNG: nhánh riêng, chỉ nối vào loa khi ở gần hang (bộ vang tốn CPU).
     D.busHang = taoGain(ctx, 1);
     D.noiHang = false;
+    D.lucXaHang = 0;                 // thời điểm bắt đầu ở xa hang (để ngắt nhánh hang sau 3 s)
     D.vang = ctx.createConvolver();
     D.vang.buffer = taoXungVang(ctx, 2.5);
     D.guiVang = taoGain(ctx, 1);                // giọt nước gửi vào bộ vang
@@ -418,7 +420,10 @@
     // Chim vẫn bay trong lúc kêu → cho tiếng trượt theo hướng bay
     var x1 = chim.p.x + chim.v.x * (t - t0), y1 = chim.p.y + chim.v.y * (t - t0), z1 = chim.p.z + chim.v.z * (t - t0);
     if (pan.positionX) {
-      datViTri(pan, chim.p.x, chim.p.y, chim.p.z, t0, 0);
+      // Đặt vị trí NGAY (ctx.currentTime), không đợi t0: panner HRTF chốt hướng ở khung âm thanh
+      // đầu tiên nó xử lý rồi mới trượt dần (~46 ms) → đặt muộn thì đầu tiếng kêu nghe từ gốc toạ độ
+      datViTri(pan, chim.p.x, chim.p.y, chim.p.z, A.ctx.currentTime, 0);
+      datViTri(pan, chim.p.x, chim.p.y, chim.p.z, t0, 0);      // điểm bắt đầu của đoạn trượt theo hướng bay
       pan.positionX.linearRampToValueAtTime(x1, t);
       pan.positionY.linearRampToValueAtTime(y1, t);
       pan.positionZ.linearRampToValueAtTime(z1, t);
@@ -467,7 +472,9 @@
     bao.gain.linearRampToValueAtTime(dinh, t0 + 0.003);
     bao.gain.setTargetAtTime(0, t0 + 0.004, ngauNhien(0.025, 0.055));
     var pan = taoPanner(ctx, 'HRTF', 4);
-    datViTri(pan, x, y, z, t0, 0);
+    // Đặt vị trí NGAY, không đợi t0: panner HRTF chốt hướng ở khung đầu tiên nó xử lý → đặt muộn
+    // thì phần đầu tiếng giọt (phần nghe rõ nhất) lại phát ra từ phía gốc toạ độ
+    datViTri(pan, x, y, z, ctx.currentTime, 0);
     osc.connect(bao);
     bao.connect(pan); pan.connect(A.busHang);
     bao.connect(A.guiVang);
@@ -671,11 +678,22 @@
       A.busConTrung.connect(A.locNgoai);
       A.noiConTrung = true;
       A.ctTiep = 0;
+      A.lucSangCT = 0;
     } else if (A.noiConTrung && dem < 0.4) {
-      A.busConTrung.disconnect();
-      A.noiConTrung = false;
+      if (!A.lucSangCT) {
+        // Trời đã sáng nhưng âm lượng (trượt τ 0,5 s) còn ~ -10 dB: hạ nhanh về 0 trước,
+        // 0,4 s sau mới ngắt → không cắt ngang tiếng kêu đang vang (tiếng "tách")
+        A.lucSangCT = c;
+        A.busConTrung.gain.setTargetAtTime(0, c, 0.05);
+        A.nConTrung.cu = 0;
+      } else if (c - A.lucSangCT > 0.4) {
+        A.busConTrung.disconnect();
+        A.noiConTrung = false;
+      }
+    } else {
+      A.lucSangCT = 0;      // tối lại trước khi kịp ngắt → vanNum bên dưới mở to lại
     }
-    if (A.noiConTrung) {
+    if (A.noiConTrung && !A.lucSangCT) {
       vanNum(A.nConTrung, 0.22 * ss(0.45, 0.85, dem) * (1 - kHang), 0.5);
       if (c >= A.ctTiep) {
         A.ctTiep = c + 3;
@@ -688,15 +706,28 @@
       if (!A.noiHang && dCc < R_NOI_HANG) {
         A.busHang.connect(A.tron);
         A.noiHang = true;
-      } else if (A.noiHang && dCc > R_NGAT_HANG) {
-        A.busHang.disconnect();
-        A.noiHang = false;
+        A.lucXaHang = 0;
       }
       if (A.noiHang) {
+        // Gửi mức TRƯỚC khi xét ngắt: dịch chuyển ra xa (nút "Ra khỏi hang", phím M) thì tiếng ù,
+        // tiếng vang vẫn nhỏ dần về mức ngoài trời, không đóng băng ở mức trong hang
         vanNum(A.nNenHang, 0.3 * kHang, 0.6);
         vanNum(A.nGuiVangNgoai, 0.6 * kHang, 0.6);
         // Đứng ngoài cửa hang: tiếng giọt nước khô gần như mất, chỉ còn tiếng vang vọng ra
         vanNum(A.nVang, 0.35 + 0.45 * kHang, 0.6);
+        // Ở xa đủ 3 s (tiếng ù 3τ ≈ 1,8 s, đuôi vang 2,5 s đã tắt) mới ngắt → không "bụp",
+        // lần nối sau không bật lại tiếng ù / đuôi vang cũ
+        if (dCc > R_NGAT_HANG) {
+          if (!A.lucXaHang) A.lucXaHang = c;
+          if (c - A.lucXaHang > 3) {
+            A.busHang.disconnect();
+            A.noiHang = false;
+          }
+        } else {
+          A.lucXaHang = 0;
+        }
+      }
+      if (A.noiHang) {
         var ngheGiot = A.trongHang || dCc < R_GIOT;
         if (!ngheGiot) {
           A.giotTiep = c + ngauNhien(0.3, 1.5);

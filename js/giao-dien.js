@@ -143,6 +143,8 @@
 
       this.khiNhanPhim = function (e) {
         if (HALONG.boQuaPhimTat(e) || e.repeat) return;   // giữ phím lâu: trình duyệt lặp keydown
+        // Còn ở màn hình chờ (khung cảnh bị che, đang ẩn): chỉ cho chọn trước tắt / bật tiếng
+        if (HALONG.daBatDau === false && e.code !== 'KeyT') return;
         switch (e.code) {
           case 'KeyH': this.bangHuongDan.classList.toggle('an'); break;
           case 'KeyB': this.banDo.classList.toggle('an'); break;
@@ -205,8 +207,10 @@
       HALONG.batDau = function () {
         if (HALONG.daBatDau) return;
         HALONG.daBatDau = true;
+        sceneEl.object3D.visible = true;                // hiện lại khung cảnh đã ẩn lúc chờ
         if (HALONG.amThanh) HALONG.amThanh.batDau();     // ngay trong thao tác bấm → được phép phát tiếng
         if (man) {
+          if (nut) nut.blur();                           // không giữ focus trên nút đã ẩn
           man.classList.add('an-di');
           setTimeout(function () { man.hidden = true; }, 800);
         }
@@ -237,6 +241,9 @@
               man.classList.add('san-sang');
               nut.disabled = false;
               nut.focus();                         // Enter / Space là bắt đầu luôn
+              // Màn hình chờ che kín khung 3D, shader đã biên dịch xong → ẩn cả khung cảnh tới khi
+              // bấm Bắt đầu: renderer chỉ xoá màn hình, GPU (và pin laptop) được nghỉ
+              if (!HALONG.daBatDau) sceneEl.object3D.visible = false;
             });
           });
         });
@@ -539,10 +546,12 @@
     veBanDo: function () {
       var c = this.banDo;
       if (c.classList.contains('an') || !HALONG.LO_TRINH || !HALONG.thuyen) return;
-      // Cỡ canvas theo cỡ hiển thị thật (CSS đổi theo màn hình) × mật độ điểm ảnh
-      var hop = c.getBoundingClientRect();
-      if (!hop.width) return;
-      var w = Math.round(hop.width * Math.min(window.devicePixelRatio || 1, 2));
+      // Cỡ canvas theo cỡ VÙNG NỘI DUNG thật (CSS đổi theo màn hình) × mật độ điểm ảnh.
+      // clientWidth không tính viền 1px của .hud-khung (getBoundingClientRect thì có → canvas
+      // to hơn 2px rồi bị co lại khi hiển thị → nét mờ)
+      var rong = c.clientWidth;
+      if (!rong) return;
+      var w = Math.round(rong * Math.min(window.devicePixelRatio || 1, 2));
       if (!this.khung) this.tinhKhungBanDo();
       if (c.width !== w) { c.width = c.height = w; this.veNenBanDo(); }
       var ctx = c.getContext('2d'), p = { x: 0, y: 0 }, tt = HALONG.thuyen;
@@ -596,6 +605,7 @@
       var sc = this.el, r = sc.renderer;
       if (!r || !sc.camera) return;
       if (r.xr && r.xr.isPresenting) return;          // đang đeo kính: không chụp kiểu này được
+      if (HALONG.daBatDau === false) return;           // còn ở màn hình chờ: khung cảnh đang ẩn
       // Canvas WebGL không giữ ảnh sau khi hiển thị (preserveDrawingBuffer: false – để nhanh hơn)
       // → vẽ lại 1 khung rồi chép NGAY sang canvas 2D trong cùng lượt chạy
       r.render(sc.object3D, sc.camera);

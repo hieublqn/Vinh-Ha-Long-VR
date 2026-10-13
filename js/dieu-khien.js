@@ -77,11 +77,16 @@
     },
 
     khiNhanPhim: function (e) {
-      if (HALONG.dangGoChu(e)) return;
+      // Còn ở màn hình chờ: chưa cho đi lại / đổi chế độ (và để Space bấm được nút "Bắt đầu")
+      if (HALONG.dangGoChu(e) || HALONG.daBatDau === false) return;
       this.phim[e.code] = true;
       if (e.code === 'KeyM' && !e.repeat && !HALONG.boQuaPhimTat(e)) this.doiCheDo();
-      // Chặn hành vi mặc định: Space cuộn trang / bấm nhầm nút đang focus, mũi tên cuộn trang
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) >= 0) {
+      // Chặn hành vi mặc định: Space cuộn trang, mũi tên cuộn trang. Riêng Space khi đang focus
+      // 1 NÚT (dùng phím Tab) thì để trình duyệt bấm nút đó; nút HUD tự blur() sau khi bấm chuột
+      // nên bình thường Space vẫn là bay lên.
+      var laNut = e.target && e.target.tagName === 'BUTTON';
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) >= 0 &&
+          !(e.code === 'Space' && laNut)) {
         e.preventDefault();
       }
     },

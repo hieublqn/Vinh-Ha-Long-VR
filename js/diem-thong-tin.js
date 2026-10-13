@@ -25,6 +25,15 @@
 
   var HALONG = window.HALONG;
   var FONT = '"Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif';
+  var TRUC_Y = new THREE.Vector3(0, 1, 0);
+
+  // Raycaster của A-Frame / three.js KHÔNG bỏ qua vật đang ẩn (visible = false) → bảng đã đóng,
+  // biểu tượng đang ẩn vẫn "đỡ" mất cú bấm và hiện con trỏ bàn tay giữa trời trống.
+  // Gán hàm này làm raycast của lưới: đang ẩn thì tia đi xuyên qua.
+  var raycastGoc = THREE.Mesh.prototype.raycast;
+  function raycastKhiHien(tia, ketQua) {
+    if (this.visible) raycastGoc.call(this, tia, ketQua);
+  }
 
   /* ---------- Nội dung thuyết minh ---------- */
   var THUYET_MINH = {
@@ -182,7 +191,10 @@
       this.dsDiem = [];
       this.viTriCam = new THREE.Vector3();
       this.qCam = new THREE.Quaternion();
+      this.qXoay = new THREE.Quaternion();
+      this.eulerBang = new THREE.Euler();
       this.tam = new THREE.Vector3();
+      this.bangTheoThuyen = null;
       HALONG.THUYET_MINH = THUYET_MINH;
       HALONG.diemThongTin = { mo: this.moBang.bind(this), dong: this.dongBang.bind(this) };
 
@@ -190,11 +202,67 @@
         if (e.code === 'Escape' && this.bangDangMo) this.dongBang();
       }.bind(this);
       window.addEventListener('keydown', this.khiPhim);
+
+      // Kéo chuột để xoay góc nhìn cũng sinh 'click' (cursor của A-Frame chỉ xét lúc nhả chuột
+      // có còn trên cùng vật không, không xét chuột đã di chuyển) → theo dõi chuột ở pha CAPTURE
+      // trên window (chạy trước cursor, vì cursor nghe trên canvas). Lấy quãng xa NHẤT trong lúc
+      // giữ chuột, không lấy chỗ nhả: kéo qua kéo lại để nhìn rồi thả gần chỗ cũ vẫn là kéo.
+      // Lưu ý: cursor của A-Frame cũng tự phát 'mousedown' / 'mouseup' dạng CustomEvent (không có
+      // toạ độ) lên entity bị trỏ, và chúng nổi bọt lên tới window → chỉ xét sự kiện THẬT.
+      function laSuKienThat(e) {
+        return e instanceof MouseEvent || (typeof TouchEvent !== 'undefined' && e instanceof TouchEvent);
+      }
+      this.chuot = { x: 0, y: 0, dangGiu: false, xaNhat: 0, keo: false, luc: 0 };
+      this.khiNhanChuot = function (e) {
+        if (!laSuKienThat(e)) return;
+        var d = e.touches ? e.touches[0] : e;
+        if (!d) return;
+        this.chuot.x = d.clientX; this.chuot.y = d.clientY;
+        this.chuot.dangGiu = true; this.chuot.xaNhat = 0;
+      }.bind(this);
+      this.capNhatXaNhat = function (d) {
+        if (this.chuot.dangGiu && d) this.chuot.xaNhat = Math.max(this.chuot.xaNhat, Math.hypot(d.clientX - this.chuot.x, d.clientY - this.chuot.y));
+      };
+      this.khiDiChuot = function (e) {
+        if (laSuKienThat(e)) this.capNhatXaNhat(e.touches ? e.touches[0] : e);
+      }.bind(this);
+      this.khiNhaChuot = function (e) {
+        if (!laSuKienThat(e)) return;
+        this.capNhatXaNhat(e.changedTouches ? e.changedTouches[0] : e);
+        this.chuot.keo = this.chuot.xaNhat > 6;
+        this.chuot.dangGiu = false;
+        this.chuot.luc = performance.now();
+      }.bind(this);
+      window.addEventListener('mousedown', this.khiNhanChuot, true);
+      window.addEventListener('touchstart', this.khiNhanChuot, true);
+      window.addEventListener('mousemove', this.khiDiChuot, true);
+      window.addEventListener('touchmove', this.khiDiChuot, true);
+      window.addEventListener('mouseup', this.khiNhaChuot, true);
+      window.addEventListener('touchend', this.khiNhaChuot, true);
+
       var sceneEl = this.el.sceneEl;
-      this.khiDenDiem = this.khiDenDiemDung.bind(this);
-      this.khiRoiDiem = function () { if (this.bangDiemDung) this.dongBang(); }.bind(this);
+      this.diemDangNeo = null;                  // điểm dừng thuyền đang neo (null khi thuyền chạy)
+      this.khiDenDiem = function (e) { this.diemDangNeo = e.detail; this.khiDenDiemDung(e); }.bind(this);
+      this.khiRoiDiem = function () { this.diemDangNeo = null; if (this.bangDiemDung) this.dongBang(); }.bind(this);
+      // Vào kính / bấm Bắt đầu khi thuyền ĐANG neo (nhất là điểm xuất phát: 'den-diem-dung' đã
+      // phát lúc nạp cảnh, khi chưa vào kính) → hiện thuyết minh của điểm đó.
+      // setTimeout 0: chờ giao-dien chạy HALONG.batDau trong cùng sự kiện enter-vr (thứ tự
+      // các listener của cùng 1 sự kiện không chắc chắn)
+      this.khiVaoKinh = function () {
+        var self = this;
+        setTimeout(function () {
+          if (self.diemDangNeo && !self.bangDangMo && HALONG.thuyen && HALONG.thuyen.trangThai === 'dung') {
+            self.khiDenDiemDung({ detail: self.diemDangNeo });
+          }
+        }, 0);
+      }.bind(this);
+      // Rời thuyền / lên thuyền / dịch chuyển vào hang: bảng đang mở không còn đúng chỗ → đóng
+      this.khiDoiCheDo = function () { if (this.bangDangMo) this.dongBang(); }.bind(this);
       sceneEl.addEventListener('den-diem-dung', this.khiDenDiem);
       sceneEl.addEventListener('roi-diem-dung', this.khiRoiDiem);
+      sceneEl.addEventListener('enter-vr', this.khiVaoKinh);
+      sceneEl.addEventListener('bat-dau', this.khiVaoKinh);
+      sceneEl.addEventListener('doi-che-do', this.khiDoiCheDo);
 
       // Vị trí các điểm cần dữ liệu của đảo, làng, hang → dựng khi cảnh đã nạp xong
       if (sceneEl.hasLoaded) this.dung();
@@ -204,9 +272,25 @@
     remove: function () {
       var sceneEl = this.el.sceneEl;
       window.removeEventListener('keydown', this.khiPhim);
+      window.removeEventListener('mousedown', this.khiNhanChuot, true);
+      window.removeEventListener('touchstart', this.khiNhanChuot, true);
+      window.removeEventListener('mousemove', this.khiDiChuot, true);
+      window.removeEventListener('touchmove', this.khiDiChuot, true);
+      window.removeEventListener('mouseup', this.khiNhaChuot, true);
+      window.removeEventListener('touchend', this.khiNhaChuot, true);
       sceneEl.removeEventListener('den-diem-dung', this.khiDenDiem);
       sceneEl.removeEventListener('roi-diem-dung', this.khiRoiDiem);
+      sceneEl.removeEventListener('enter-vr', this.khiVaoKinh);
+      sceneEl.removeEventListener('bat-dau', this.khiVaoKinh);
+      sceneEl.removeEventListener('doi-che-do', this.khiDoiCheDo);
+      document.body.classList.remove('dang-thuyet-minh');
       while (this.el.firstChild) this.el.removeChild(this.el.firstChild);
+    },
+
+    // Vừa nhả chuột / ngón tay sau khi KÉO (> 6 px) → là xoay góc nhìn, không phải bấm.
+    // Chỉ tính cú nhả vừa xảy ra (400 ms): tia tay cầm VR (Mốc 5) không có sự kiện chuột.
+    laKeo: function () {
+      return this.chuot.keo && performance.now() - this.chuot.luc < 400;
     },
 
     /* ---------- Vị trí từng điểm (toạ độ thế giới), tính từ dữ liệu khung cảnh ---------- */
@@ -236,14 +320,17 @@
       // 4) Hang Sửng Sốt: phía trên cửa hang; 5) trong khoang hang
       var h = HALONG.hangDong;
       if (h) {
-        ds.push({ id: 'hang-sung-sot', viTri: h.S.clone().addScaledVector(h.n, 8).setY(14) });
+        // trước nửa trên cửa vòm (vòm cao 1,6–10,6 m): cao hơn nữa thì ở màn 1366×768 biểu tượng
+        // rơi đúng vào góc có bản đồ nhỏ
+        ds.push({ id: 'hang-sung-sot', viTri: h.S.clone().addScaledVector(h.n, 8).setY(8) });
         ds.push({ id: 'nhu-da', viTri: h.Cc.clone().addScaledVector(h.nVao, 2).setY(h.sanY + 3.4), trongHang: true });
       }
       // 6) Làng chài; 7) lồng bè nuôi cá
       var L = HALONG.langChai;
       if (L) {
         ds.push({ id: 'cua-van', viTri: new THREE.Vector3(L.x, 10, L.z) });
-        if (L.diem) { var lb = L.diem(-6, -16); ds.push({ id: 'nuoi-ca', viTri: new THREE.Vector3(lb.x, 4.2, lb.z) }); }
+        // cao hơn mái nhà bè (~5–6 m), không thì từ điểm dừng bị mái nhà che mất
+        if (L.diem) { var lb = L.diem(-6, -16); ds.push({ id: 'nuoi-ca', viTri: new THREE.Vector3(lb.x, 7.5, lb.z) }); }
       }
       // 8) Hòn Gà Chọi: trên đỉnh 2 hòn đá
       var gc = vatThe('ga-choi');
@@ -252,9 +339,10 @@
         (HALONG.vatCan || []).forEach(function (o) { if (Math.hypot(o.x - gc.vatThe.x, o.z - gc.vatThe.z) < 12) cao = Math.max(cao, o.cao); });
         ds.push({ id: 'ga-choi', viTri: new THREE.Vector3(gc.vatThe.x, cao + 4, gc.vatThe.z) });
       }
-      // 9) Thuyền buồm: gắn trên thuyền, phía trước mái cabin (toạ độ CỤC BỘ của thuyền)
+      // 9) Thuyền buồm: gắn trên thuyền (toạ độ CỤC BỘ của thuyền), ở mạn trái ngoài vùng buồm
+      //    quét – đặt giữa trục thuyền thì bị cột buồm, sào buồm che kín khi quay lại nhìn
       if (HALONG.thuyen) {
-        ds.push({ id: 'thuyen-buom', cucBoThuyen: new THREE.Vector3(0, HALONG.thuyen.doCaoBoong(2.7) + 3.6, 2.2), viTri: new THREE.Vector3() });
+        ds.push({ id: 'thuyen-buom', cucBoThuyen: new THREE.Vector3(-2.6, HALONG.thuyen.doCaoBoong(-1) + 2.8, -1), viTri: new THREE.Vector3() });
       }
       return ds;
     },
@@ -273,10 +361,11 @@
         self.el.appendChild(el);
         var luoi = new THREE.Mesh(hinh, vl);
         luoi.renderOrder = 5;
+        luoi.raycast = raycastKhiHien;
         el.setObject3D('mesh', luoi);
         el.addEventListener('mouseenter', function () { d.tro = true; });
         el.addEventListener('mouseleave', function () { d.tro = false; });
-        el.addEventListener('click', function () { if (luoi.visible) self.moBang(d.id); });
+        el.addEventListener('click', function () { if (luoi.visible && !self.laKeo()) self.moBang(d.id); });
         d.el = el; d.luoi = luoi; d.pha = i * 1.7; d.tro = false; d.phong = 1;
         self.dsDiem.push(d);
       });
@@ -298,12 +387,13 @@
       this.luoiBang = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.375), vl);
       this.luoiBang.renderOrder = 9000;           // dưới quả cầu chuyển cảnh (9999) của giao-dien
       this.luoiBang.visible = false;
+      this.luoiBang.raycast = raycastKhiHien;
       var el = this.elBang = document.createElement('a-entity');
       el.classList.add('diem-tt');
       this.el.appendChild(el);
       el.setObject3D('mesh', this.luoiBang);
       el.addEventListener('click', function (e) {
-        if (!self.bangDangMo) return;
+        if (!self.bangDangMo || self.laKeo()) return;
         var giao = e.detail && e.detail.intersection;
         var hd = self.hanhDongBang;
         // Nút hành động ở góc phải dưới của bảng (uv: 0..1, gốc ở góc trái dưới)
@@ -373,21 +463,41 @@
       this.veBang(tm.tieuDe, tm.noiDung, tm.nhan || 'Thuyết minh', tm.hanhDong || null);
       this.hanhDongBang = tm.hanhDong || null;
       this.bangDiemDung = !!noiDungRieng;
-      // Đặt bảng trước mặt người xem 2,1 m, thấp hơn tầm mắt một chút, quay mặt về người xem
-      var cam = this.el.sceneEl.camera, p = this.viTriCam, f = this.tam;
+      // Đặt bảng trước mặt người xem, hơi thấp hơn hướng nhìn, nghiêng quay mặt thẳng về mắt.
+      // Hướng = góc quay ngang (yaw) + góc cúi/ngửa kẹp ±34°: cúi nhìn làng chài bên dưới hay
+      // ngửa nhìn đỉnh đảo vẫn thấy bảng ngay trong khung hình
+      var sceneEl = this.el.sceneEl, cam = sceneEl.camera, p = this.viTriCam, f = this.tam;
       cam.getWorldPosition(p);
-      cam.getWorldDirection(f);
-      f.y = 0;
-      if (f.lengthSq() < 1e-4) f.set(0, 0, -1);
-      f.normalize();
+      cam.getWorldQuaternion(this.qCam);
+      var eu = this.eulerBang.setFromQuaternion(this.qCam, 'YXZ');
+      var cui = THREE.MathUtils.clamp(eu.x, -0.6, 0.6);
+      f.set(-Math.sin(eu.y) * Math.cos(cui), Math.sin(cui), -Math.cos(eu.y) * Math.cos(cui));
+      // Màn dọc / hẹp (không đeo kính): góc nhìn ngang nhỏ → lùi bảng (rộng 2,2 m) ra xa cho vừa.
+      // projectionMatrix[0] = 1 / tan(nửa góc ngang); hệ số 1,3 → bảng chiếm ~85 % bề ngang
+      var kc = 2.1;
+      if (!sceneEl.is('vr-mode')) kc = Math.max(2.1, 1.3 * cam.projectionMatrix.elements[0]);
       var o = this.elBang.object3D;
-      o.position.copy(p).addScaledVector(f, 2.1);
-      o.position.y = p.y - 0.15;
-      o.lookAt(p.x, o.position.y, p.z);
+      o.position.copy(p).addScaledVector(f, kc);
+      o.position.y -= 0.15;
+      o.lookAt(p);
+      // Đang đứng trên thuyền: thuyền chạy 5 m/s → bảng đứng yên trong thế giới sẽ lướt qua
+      // người xem sau ~0,4 s. Ghi vị trí + hướng bảng theo HỆ TOẠ ĐỘ THUYỀN (chỉ xoay ngang,
+      // giống rig ở dieu-khien.diTrenBoong), mỗi khung đặt lại theo thuyền.
+      this.bangTheoThuyen = null;
+      var tt = HALONG.thuyen, rig = document.querySelector('[dieu-khien]');
+      if (tt && rig && rig.getAttribute('dieu-khien').cheDo === 'du-thuyen') {
+        var c = Math.cos(tt.goc), s = Math.sin(tt.goc);
+        var dx = o.position.x - tt.viTri.x, dz = o.position.z - tt.viTri.z;
+        this.bangTheoThuyen = {
+          x: dx * c - dz * s, y: o.position.y - tt.viTri.y, z: dx * s + dz * c,
+          q: this.qXoay.setFromAxisAngle(TRUC_Y, -tt.goc).clone().multiply(o.quaternion)
+        };
+      }
       this.luoiBang.visible = true;
       this.bangDangMo = true;
-      this.tamBang = o.position.clone();
-      this.el.sceneEl.emit('mo-thuyet-minh', { id: id || null });
+      // Bảng HTML của điểm dừng (giữa màn hình) nhường chỗ cho bảng 3D – xem style.css
+      document.body.classList.add('dang-thuyet-minh');
+      sceneEl.emit('mo-thuyet-minh', { id: id || null });
     },
 
     dongBang: function () {
@@ -395,6 +505,8 @@
       this.luoiBang.visible = false;
       this.bangDangMo = false;
       this.bangDiemDung = false;
+      this.bangTheoThuyen = null;
+      document.body.classList.remove('dang-thuyet-minh');
     },
 
     // Đeo kính VR + đang trên thuyền: tới điểm dừng thì tự hiện bảng thuyết minh 3D
@@ -440,8 +552,17 @@
         o.scale.set(co, co, co);
         o.quaternion.copy(q);                   // luôn quay mặt về camera
       }
-      // Bảng thuyết minh: đi xa quá 15 m (thuyền chạy, bay đi) thì tự đóng
-      if (this.bangDangMo && !this.bangDiemDung && p.distanceTo(this.tamBang) > 15) this.dongBang();
+      if (!this.bangDangMo) return;
+      // Bảng mở lúc đứng trên thuyền: đi theo thuyền (du-thuyen đã dời thuyền trước trong khung này
+      // vì component đăng ký trước → không trễ 1 khung)
+      var bt = this.bangTheoThuyen, ob = this.elBang.object3D;
+      if (bt && HALONG.thuyen) {
+        var tt = HALONG.thuyen, c = Math.cos(tt.goc), s = Math.sin(tt.goc);
+        ob.position.set(tt.viTri.x + bt.x * c + bt.z * s, tt.viTri.y + bt.y, tt.viTri.z - bt.x * s + bt.z * c);
+        ob.quaternion.setFromAxisAngle(TRUC_Y, tt.goc).multiply(bt.q);
+      }
+      // Người xem đi xa bảng quá 15 m (bay đi chỗ khác) thì tự đóng
+      if (!this.bangDiemDung && p.distanceTo(ob.position) > 15) this.dongBang();
     }
   });
 })();

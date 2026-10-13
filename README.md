@@ -14,6 +14,9 @@ Toàn bộ cảnh (trời, biển, đảo đá vôi...) được **sinh bằng c
 | VS Code Live Server | Chuột phải `index.html` → *Open with Live Server* | Địa chỉ `http://127.0.0.1:5500` |
 | Kính VR (Meta Quest) | Đưa thư mục lên GitHub Pages (https) rồi mở bằng trình duyệt của kính | WebXR chỉ chạy trên `https://` hoặc `localhost` |
 
+Cần trình duyệt có **WebGL2** (Chrome, Edge, Firefox bản mới). Máy không hỗ trợ (card đồ hoạ quá cũ,
+driver lỗi, bị chặn) thì màn hình chờ sẽ báo lỗi rõ ràng thay vì đứng ở "Đang dựng…".
+
 Khi chạy qua `file://`, console của A-Frame có in một dòng chữ đỏ *"served via the file:// protocol"*.
 Dòng đó chỉ cảnh báo chung về việc tải ảnh/mô hình. Dự án này không tải file nào nên **không ảnh hưởng**.
 
@@ -36,7 +39,9 @@ Dòng đó chỉ cảnh báo chung về việc tải ảnh/mô hình. Dự án n
 - **Biểu tượng "i"** nổi gần các cảnh (9 điểm: toàn cảnh vịnh, đảo đá vôi, Ti Tốp, Hang Sửng Sốt,
   thạch nhũ trong hang, làng chài Cửa Vạn, nhà bè nuôi cá, Hòn Gà Chọi, thuyền buồm nâu). Bấm chuột
   (hoặc chạm) vào biểu tượng → hiện **bảng thuyết minh 3D** trước mặt; bấm vào bảng (hoặc `Esc`) để đóng.
-  Khi đeo kính VR, tới điểm dừng là bảng thuyết minh 3D tự hiện.
+  Kéo chuột để nhìn quanh không làm đóng bảng. Bảng mở lúc đứng trên thuyền sẽ đi theo thuyền (đọc được
+  cả khi thuyền đang chạy). Khi đeo kính VR, tới điểm dừng (hoặc vào kính lúc thuyền đang neo) là bảng
+  thuyết minh 3D tự hiện.
 - **Âm thanh tạo bằng code** (Web Audio, không có file âm thanh): sóng biển, nước vỗ mạn thuyền, gió,
   tiếng hải âu (ban ngày), dế kêu (ban đêm), giọt nước rơi vang trong hang. Âm thanh có hướng: quay đầu
   là nghe tiếng chim đổi bên. Nút loa 🔊 cạnh nút thời điểm hoặc phím `T` để tắt / bật.
