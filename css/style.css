@@ -455,7 +455,8 @@ body.cam-ung .a-canvas { touch-action: none; }
 /* Cửa sổ hẹp: cụm nút thời điểm (thêm nút ⚙ ở Mốc 5) rộng ~330px → dưới ~680px là đè bảng
    hướng dẫn ở góc trái trên → dời bảng xuống dưới cụm nút (giữ bề rộng để bảng không dài ra) */
 @media (max-width: 700px) {
-  #bang-huong-dan { top: 64px; }
+  #bang-huong-dan { top: 64px; padding: 10px 14px; }
+  #bang-huong-dan ul { line-height: 1.7; }   /* bảng thấp bớt ~30px, không chạm bảng điểm dừng */
 }
 
 /* Màn hẹp (điện thoại dọc): thu nhỏ bảng hướng dẫn, đặt dưới nút thời điểm */
